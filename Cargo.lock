@@ -2015,6 +2015,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "iceberg-glue"
+version = "0.1.0"
+
+[[package]]
 name = "iceberg-rest-catalog"
 version = "0.0.1"
 dependencies = [
