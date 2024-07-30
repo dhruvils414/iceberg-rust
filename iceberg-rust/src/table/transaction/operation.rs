@@ -28,7 +28,7 @@ use iceberg_rust_spec::spec::{
 };
 use iceberg_rust_spec::util::strip_prefix;
 use iceberg_rust_spec::{
-    error::Error as SpecError,
+    error::IcebergError as SpecError,
     spec::table_metadata::TableMetadata,
 };
 use crate::table::Table;
@@ -37,7 +37,7 @@ use object_store::ObjectStore;
 
 use crate::{
     catalog::commit::{TableRequirement, TableUpdate},
-    error::Error,
+    error::IcebergError,
 };
 
 #[derive(Debug)]
@@ -99,7 +99,7 @@ impl Operation {
         table: &Table,
         table_metadata: &TableMetadata,
         object_store: Arc<dyn ObjectStore>,
-    ) -> Result<(Option<TableRequirement>, Vec<TableUpdate>), Error> {
+    ) -> Result<(Option<TableRequirement>, Vec<TableUpdate>), IcebergError> {
         match self {
             Operation::NewAppend {
                 branch,
@@ -113,14 +113,14 @@ impl Operation {
                 let datafiles = Arc::new(
                     files
                     .into_iter()
-                    .map(Ok::<_, Error>)
+                    .map(Ok::<_, IcebergError>)
                     .try_fold(
                         HashMap::<Struct, Vec<DataFile>>::new(),
                         |mut acc, x| {
                             let x = x?;
                             let partition_value = x.partition().clone();
                             acc.entry(partition_value).or_default().push(x);
-                            Ok::<_, Error>(acc)
+                            Ok::<_, IcebergError>(acc)
                         },
                     )?
                 );
@@ -266,7 +266,7 @@ impl Operation {
                         .iter()
                         .map(|x| schema.fields().get(*x.source_id() as usize))
                         .collect::<Option<Vec<_>>>()
-                        .ok_or(Error::InvalidFormat(
+                        .ok_or(IcebergError::InvalidFormat(
                             "Partition column in schema".to_string(),
                         ))?,
                 );
@@ -372,7 +372,7 @@ impl Operation {
                     .with_schema_id(*schema.schema_id());
                 let snapshot = snapshot_builder
                     .build()
-                    .map_err(iceberg_rust_spec::error::Error::from)?;
+                    .map_err(iceberg_rust_spec::error::IcebergError::from)?;
 
                 Ok((
                     old_snapshot.map(|x| TableRequirement::AssertRefSnapshotId {
@@ -403,13 +403,13 @@ impl Operation {
                 let schema = table_metadata.current_schema(branch.as_deref())?.clone();
 
                 // Split datafils by partition
-                let datafiles = Arc::new(files.into_iter().map(Ok::<_, Error>).try_fold(
+                let datafiles = Arc::new(files.into_iter().map(Ok::<_, IcebergError>).try_fold(
                     HashMap::<Struct, Vec<DataFile>>::new(),
                     |mut acc, x| {
                         let x = x?;
                         let partition_value = x.partition().clone();
                         acc.entry(partition_value).or_default().push(x);
-                        Ok::<_, Error>(acc)
+                        Ok::<_, IcebergError>(acc)
                     },
                 )?);
 
@@ -458,7 +458,7 @@ impl Operation {
                         .iter()
                         .map(|x| schema.fields().get(*x.source_id() as usize))
                         .collect::<Option<Vec<_>>>()
-                        .ok_or(Error::InvalidFormat(
+                        .ok_or(IcebergError::InvalidFormat(
                             "Partition column in schema".to_string(),
                         ))?,
                 );
@@ -533,7 +533,7 @@ impl Operation {
                     });
                 let snapshot = snapshot_builder
                     .build()
-                    .map_err(iceberg_rust_spec::error::Error::from)?;
+                    .map_err(iceberg_rust_spec::error::IcebergError::from)?;
 
                 let old_snapshot_ids: Vec<i64> =
                     table_metadata.snapshots.keys().map(Clone::clone).collect();
@@ -602,7 +602,7 @@ impl Operation {
                 let all_datafiles = table
                 .datafiles(&manifests, None)
                 .await
-                .map_err(Into::<Error>::into)?;
+                .map_err(Into::<IcebergError>::into)?;
 
                 let pruned_data_files = if let Some(physical_predicate) = filter.clone() {
                     let arrow_schema: SchemaRef = Arc::new((schema.fields()).try_into().unwrap());
@@ -610,7 +610,7 @@ impl Operation {
                     match PruningPredicate::try_new(physical_predicate, arrow_schema.clone()) {
                         Ok(predicate) => predicate,
                         Err(e) => {
-                            return Err(Error::IO(e.into()));
+                            return Err(IcebergError::IO(e.into()));
                         }
                     };
 
@@ -619,7 +619,7 @@ impl Operation {
                     {
                         Ok(files) => files,
                         Err(e) => {
-                            return Err(Error::IO(e.into()));
+                            return Err(IcebergError::IO(e.into()));
                         }
                     };
 
@@ -659,13 +659,13 @@ impl Operation {
                 files.append(&mut new_files.clone());
                 
                 // Split datafils by partition
-                let datafiles = Arc::new(files.clone().into_iter().map(Ok::<_, Error>).try_fold(
+                let datafiles = Arc::new(files.clone().into_iter().map(Ok::<_, IcebergError>).try_fold(
                     HashMap::<Struct, Vec<DataFile>>::new(),
                     |mut acc, x| {
                         let x = x?;
                         let partition_value = x.partition().clone();
                         acc.entry(partition_value).or_default().push(x);
-                        Ok::<_, Error>(acc)
+                        Ok::<_, IcebergError>(acc)
                     },
                 )?);
 
@@ -718,7 +718,7 @@ impl Operation {
                             .iter()
                             .map(|x| schema.fields().get(*x.source_id() as usize))
                             .collect::<Option<Vec<_>>>()
-                            .ok_or(Error::InvalidFormat(
+                            .ok_or(IcebergError::InvalidFormat(
                                 "Partition column in schema".to_string(),
                             ))?,
                     );
@@ -799,7 +799,7 @@ impl Operation {
 
                 let snapshot = snapshot_builder
                     .build()
-                    .map_err(iceberg_rust_spec::error::Error::from)?;
+                    .map_err(iceberg_rust_spec::error::IcebergError::from)?;
             
                 Ok((
                     old_snapshot.map(|x| TableRequirement::AssertRefSnapshotId {
@@ -860,7 +860,7 @@ pub(crate) async fn write_manifest(
     partition_columns: &[&StructField],
     object_store: Arc<dyn ObjectStore>,
     branch: Option<String>,
-) -> Result<ManifestListEntry, Error> {
+) -> Result<ManifestListEntry, IcebergError> {
     let manifest_schema = ManifestEntry::schema(
         &partition_value_schema(table_metadata.default_partition_spec()?.fields(), schema)?,
         &table_metadata.format_version,
@@ -890,7 +890,7 @@ pub(crate) async fn write_manifest(
     };
     let files_count = manifest.added_files_count.unwrap_or_default() + files.len() as i32;
     for path in files {
-        for datafile in datafiles.get(&path).ok_or(Error::InvalidFormat(
+        for datafile in datafiles.get(&path).ok_or(IcebergError::InvalidFormat(
             "Datafiles for partition value".to_string(),
         ))? {
             let mut added_rows_count = 0;
@@ -957,19 +957,19 @@ pub(crate) async fn write_manifest(
         )
         .await?;
 
-    Ok::<_, Error>(manifest)
+    Ok::<_, IcebergError>(manifest)
 }
 
 fn update_partitions(
     partitions: &mut [FieldSummary],
     partition_values: &Struct,
     partition_columns: &[&StructField],
-) -> Result<(), Error> {
+) -> Result<(), IcebergError> {
     for (field, summary) in partition_columns.iter().zip(partitions.iter_mut()) {
         let value = &partition_values.fields[*partition_values
             .lookup
             .get(&field.name)
-            .ok_or_else(|| Error::InvalidFormat("partition value in schema".to_string()))?];
+            .ok_or_else(|| IcebergError::InvalidFormat("partition value in schema".to_string()))?];
         if let Some(value) = value {
             if let Some(lower_bound) = &mut summary.lower_bound {
                 match (value, lower_bound) {
@@ -1082,14 +1082,14 @@ fn partition_values_in_bounds<'a>(
                         .fields()
                         .get(*field.source_id() as usize)
                         .ok_or_else(|| {
-                            Error::InvalidFormat("partition values in schema".to_string())
+                            IcebergError::InvalidFormat("partition values in schema".to_string())
                         })
                         .unwrap()
                         .name;
                     value
                         .get(name)
                         .ok_or_else(|| {
-                            Error::InvalidFormat("partition values in schema".to_string())
+                            IcebergError::InvalidFormat("partition values in schema".to_string())
                         })
                         .unwrap()
                 })

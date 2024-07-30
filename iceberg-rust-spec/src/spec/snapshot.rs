@@ -15,7 +15,7 @@ use derive_getters::Getters;
 use object_store::ObjectStore;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::Error, util};
+use crate::{error::IcebergError, util};
 
 use super::{
     manifest_list::{ManifestListEntry, ManifestListReader},
@@ -65,7 +65,7 @@ impl Snapshot {
         &self,
         table_metadata: &'metadata TableMetadata,
         object_store: Arc<dyn ObjectStore>,
-    ) -> Result<impl Iterator<Item = Result<ManifestListEntry, Error>> + 'metadata, Error> {
+    ) -> Result<impl Iterator<Item = Result<ManifestListEntry, IcebergError>> + 'metadata, IcebergError> {
         let bytes: Cursor<Vec<u8>> = Cursor::new(
             object_store
                 .get(&util::strip_prefix(&self.manifest_list).into())
@@ -95,9 +95,9 @@ impl fmt::Display for Snapshot {
 }
 
 impl str::FromStr for Snapshot {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 

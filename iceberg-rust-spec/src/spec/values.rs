@@ -22,7 +22,7 @@ use serde_bytes::ByteBuf;
 use serde_json::{Map as JsonMap, Number, Value as JsonValue};
 use uuid::Uuid;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::{
     partition::{PartitionField, Transform},
@@ -154,13 +154,13 @@ impl Struct {
         self,
         schema: &StructType,
         partition_spec: &[PartitionField],
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         // Returns a HashMap mapping partition field names to transformed types.
         let map = partition_spec
             .iter()
             .map(|partition_field| {
                 let field = schema.get(*partition_field.source_id() as usize).ok_or(
-                    Error::InvalidFormat(format!(
+                    IcebergError::InvalidFormat(format!(
                         "partition spec references unknown column id {}",
                         partition_field.source_id()
                     )),
@@ -171,7 +171,7 @@ impl Struct {
                     field.field_type.tranform(partition_field.transform())?,
                 ))
             })
-            .collect::<Result<HashMap<_, _>, Error>>()?;
+            .collect::<Result<HashMap<_, _>, IcebergError>>()?;
         Ok(Struct::from_iter(
             self.fields
                 .into_iter()
@@ -182,18 +182,18 @@ impl Struct {
                         .lookup
                         .iter()
                         .find(|(_, v)| **v == idx)
-                        .ok_or(Error::InvalidFormat("partition struct".to_string()))?
+                        .ok_or(IcebergError::InvalidFormat("partition struct".to_string()))?
                         .0;
 
                     // Get datatype after tranform
                     let datatype = map
                         .get(name)
-                        .ok_or(Error::InvalidFormat("schema".to_string()))?;
+                        .ok_or(IcebergError::InvalidFormat("schema".to_string()))?;
                     // Cast the value to the datatype
                     let value = field.map(|value| value.cast(datatype)).transpose()?;
                     Ok((name.clone(), value))
                 })
-                .collect::<Result<Vec<_>, Error>>()?,
+                .collect::<Result<Vec<_>, IcebergError>>()?,
         ))
     }
 }
@@ -265,7 +265,7 @@ impl<'de> Deserialize<'de> for Struct {
 
 impl Value {
     /// Perform a partition transformation for the given value
-    pub fn tranform(&self, transform: &Transform) -> Result<Value, Error> {
+    pub fn tranform(&self, transform: &Transform) -> Result<Value, IcebergError> {
         match transform {
             Transform::Identity => Ok(self.clone()),
             Transform::Bucket(n) => {
@@ -281,7 +281,7 @@ impl Value {
                     s.truncate(*w as usize);
                     Ok(Value::String(s))
                 }
-                _ => Err(Error::NotSupported(
+                _ => Err(IcebergError::NotSupported(
                     "Datatype for truncate partition transform.".to_string(),
                 )),
             },
@@ -313,7 +313,7 @@ impl Value {
                         .num_days()
                         / 364) as i32,
                 )),
-                _ => Err(Error::NotSupported(
+                _ => Err(IcebergError::NotSupported(
                     "Datatype for year partition transform.".to_string(),
                 )),
             },
@@ -343,7 +343,7 @@ impl Value {
                         )
                         .num_weeks()) as i32,
                 )),
-                _ => Err(Error::NotSupported(
+                _ => Err(IcebergError::NotSupported(
                     "Datatype for month partition transform.".to_string(),
                 )),
             },
@@ -373,7 +373,7 @@ impl Value {
                         )
                         .num_days()) as i32,
                 )),
-                _ => Err(Error::NotSupported(
+                _ => Err(IcebergError::NotSupported(
                     "Datatype for day partition transform.".to_string(),
                 )),
             },
@@ -402,11 +402,11 @@ impl Value {
                         )
                         .num_hours()) as i32,
                 )),
-                _ => Err(Error::NotSupported(
+                _ => Err(IcebergError::NotSupported(
                     "Datatype for hour partition transform.".to_string(),
                 )),
             },
-            _ => Err(Error::NotSupported(
+            _ => Err(IcebergError::NotSupported(
                 "Partition transform operation".to_string(),
             )),
         }
@@ -414,7 +414,7 @@ impl Value {
 
     #[inline]
     /// Create iceberg value from bytes
-    pub fn try_from_bytes(bytes: &[u8], data_type: &Type) -> Result<Self, Error> {
+    pub fn try_from_bytes(bytes: &[u8], data_type: &Type) -> Result<Self, IcebergError> {
         match data_type {
             Type::Primitive(primitive) => match primitive {
                 PrimitiveType::Boolean => {
@@ -446,21 +446,21 @@ impl Value {
                 )))),
                 PrimitiveType::Fixed(len) => Ok(Value::Fixed(*len as usize, Vec::from(bytes))),
                 PrimitiveType::Binary => Ok(Value::Binary(Vec::from(bytes))),
-                _ => Err(Error::Type("decimal".to_string(), "bytes".to_string())),
+                _ => Err(IcebergError::Type("decimal".to_string(), "bytes".to_string())),
             },
-            _ => Err(Error::NotSupported("Complex types as bytes".to_string())),
+            _ => Err(IcebergError::NotSupported("Complex types as bytes".to_string())),
         }
     }
 
     /// Create iceberg value from a json value
-    pub fn try_from_json(value: JsonValue, data_type: &Type) -> Result<Option<Self>, Error> {
+    pub fn try_from_json(value: JsonValue, data_type: &Type) -> Result<Option<Self>, IcebergError> {
         match data_type {
             Type::Primitive(primitive) => match (primitive, value) {
                 (PrimitiveType::Boolean, JsonValue::Bool(bool)) => Ok(Some(Value::Boolean(bool))),
                 (PrimitiveType::Int, JsonValue::Number(number)) => Ok(Some(Value::Int(
                     number
                         .as_i64()
-                        .ok_or(Error::Conversion(
+                        .ok_or(IcebergError::Conversion(
                             "json number".to_string(),
                             "int".to_string(),
                         ))?
@@ -468,18 +468,18 @@ impl Value {
                 ))),
                 (PrimitiveType::Long, JsonValue::Number(number)) => {
                     Ok(Some(Value::LongInt(number.as_i64().ok_or(
-                        Error::Conversion("json number".to_string(), "long".to_string()),
+                        IcebergError::Conversion("json number".to_string(), "long".to_string()),
                     )?)))
                 }
                 (PrimitiveType::Float, JsonValue::Number(number)) => Ok(Some(Value::Float(
-                    OrderedFloat(number.as_f64().ok_or(Error::Conversion(
+                    OrderedFloat(number.as_f64().ok_or(IcebergError::Conversion(
                         "json number".to_string(),
                         "float".to_string(),
                     ))? as f32),
                 ))),
                 (PrimitiveType::Double, JsonValue::Number(number)) => {
                     Ok(Some(Value::Double(OrderedFloat(number.as_f64().ok_or(
-                        Error::Conversion("json number".to_string(), "double".to_string()),
+                        IcebergError::Conversion("json number".to_string(), "double".to_string()),
                     )?))))
                 }
                 (PrimitiveType::Date, JsonValue::String(s)) => Ok(Some(Value::Date(
@@ -512,7 +512,7 @@ impl Value {
                     JsonValue::String(_),
                 ) => todo!(),
                 (_, JsonValue::Null) => Ok(None),
-                (i, j) => Err(Error::Type(i.to_string(), j.to_string())),
+                (i, j) => Err(IcebergError::Type(i.to_string(), j.to_string())),
             },
             Type::Struct(schema) => {
                 if let JsonValue::Object(mut object) = value {
@@ -523,7 +523,7 @@ impl Value {
                                 object.remove(&field.id.to_string()).and_then(|value| {
                                     Value::try_from_json(value, &field.field_type)
                                         .and_then(|value| {
-                                            value.ok_or(Error::InvalidFormat(
+                                            value.ok_or(IcebergError::InvalidFormat(
                                                 "key of map".to_string(),
                                             ))
                                         })
@@ -533,7 +533,7 @@ impl Value {
                         },
                     )))))
                 } else {
-                    Err(Error::Type(
+                    Err(IcebergError::Type(
                         "json for a struct".to_string(),
                         "object".to_string(),
                     ))
@@ -545,10 +545,10 @@ impl Value {
                         array
                             .into_iter()
                             .map(|value| Value::try_from_json(value, &list.element))
-                            .collect::<Result<Vec<_>, Error>>()?,
+                            .collect::<Result<Vec<_>, IcebergError>>()?,
                     )))
                 } else {
-                    Err(Error::Type(
+                    Err(IcebergError::Type(
                         "json for a list".to_string(),
                         "array".to_string(),
                     ))
@@ -565,23 +565,23 @@ impl Value {
                                 .map(|(key, value)| {
                                     Ok((
                                         Value::try_from_json(key, &map.key).and_then(|value| {
-                                            value.ok_or(Error::InvalidFormat(
+                                            value.ok_or(IcebergError::InvalidFormat(
                                                 "key of map".to_string(),
                                             ))
                                         })?,
                                         Value::try_from_json(value, &map.value)?,
                                     ))
                                 })
-                                .collect::<Result<Vec<_>, Error>>()?,
+                                .collect::<Result<Vec<_>, IcebergError>>()?,
                         ))))
                     } else {
-                        Err(Error::Type(
+                        Err(IcebergError::Type(
                             "json for a list".to_string(),
                             "array".to_string(),
                         ))
                     }
                 } else {
-                    Err(Error::Type(
+                    Err(IcebergError::Type(
                         "json for a list".to_string(),
                         "array".to_string(),
                     ))
@@ -635,7 +635,7 @@ impl Value {
         }
     }
     /// Cast value to different type
-    pub fn cast(self, data_type: &Type) -> Result<Self, Error> {
+    pub fn cast(self, data_type: &Type) -> Result<Self, IcebergError> {
         if self.datatype() == *data_type {
             Ok(self)
         } else {
@@ -653,7 +653,7 @@ impl Value {
                 (Value::LongInt(input), Type::Primitive(PrimitiveType::Timestamptz)) => {
                     Ok(Value::TimestampTZ(input))
                 }
-                _ => Err(Error::NotSupported("cast".to_string())),
+                _ => Err(IcebergError::NotSupported("cast".to_string())),
             }
         }
     }

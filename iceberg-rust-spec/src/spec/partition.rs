@@ -12,7 +12,7 @@ use serde::{
 
 use derive_builder::Builder;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::types::{StructType, Type};
 
@@ -156,7 +156,7 @@ impl PartitionSpec {
         PartitionSpecBuilder::default()
     }
     /// Get datatypes of partition fields
-    pub fn data_types(&self, schema: &StructType) -> Result<Vec<Type>, Error> {
+    pub fn data_types(&self, schema: &StructType) -> Result<Vec<Type>, IcebergError> {
         self.fields
             .iter()
             .map(|field| {
@@ -165,7 +165,7 @@ impl PartitionSpec {
                     .map(|x| x.field_type.clone())
             })
             .collect::<Option<Vec<_>>>()
-            .ok_or(Error::InvalidFormat("partition spec".to_string()))
+            .ok_or(IcebergError::InvalidFormat("partition spec".to_string()))
     }
 }
 
@@ -180,9 +180,9 @@ impl fmt::Display for PartitionSpec {
 }
 
 impl str::FromStr for PartitionSpec {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 

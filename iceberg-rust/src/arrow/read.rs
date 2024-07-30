@@ -13,7 +13,7 @@ use parquet::{
     errors::ParquetError,
 };
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use iceberg_rust_spec::spec::manifest::{FileFormat, ManifestEntry};
 
@@ -33,13 +33,13 @@ pub async fn read(
                             .await?;
 
                         let object_reader = ParquetObjectReader::new(object_store, object_meta);
-                        Ok::<_, Error>(
+                        Ok::<_, IcebergError>(
                             ParquetRecordBatchStreamBuilder::new(object_reader)
                                 .await?
                                 .build()?,
                         )
                     }
-                    _ => Err(Error::NotSupported("fileformat".to_string())),
+                    _ => Err(IcebergError::NotSupported("fileformat".to_string())),
                 }
             }
         })

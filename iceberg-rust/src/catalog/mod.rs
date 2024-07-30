@@ -15,7 +15,7 @@ use iceberg_rust_spec::spec::view_metadata::ViewMetadata;
 use identifier::Identifier;
 use object_store::ObjectStore;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 use crate::materialized_view::MaterializedView;
 use crate::table::Table;
 use crate::view::View;
@@ -37,62 +37,62 @@ pub trait Catalog: Send + Sync + Debug {
         &self,
         namespace: &Namespace,
         properties: Option<HashMap<String, String>>,
-    ) -> Result<HashMap<String, String>, Error>;
+    ) -> Result<HashMap<String, String>, IcebergError>;
     /// Drop a namespace in the catalog
-    async fn drop_namespace(&self, namespace: &Namespace) -> Result<(), Error>;
+    async fn drop_namespace(&self, namespace: &Namespace) -> Result<(), IcebergError>;
     /// Load the namespace properties from the catalog
     async fn load_namespace(&self, namespace: &Namespace)
-        -> Result<HashMap<String, String>, Error>;
+        -> Result<HashMap<String, String>, IcebergError>;
     /// Update the namespace properties in the catalog
     async fn update_namespace(
         &self,
         namespace: &Namespace,
         updates: Option<HashMap<String, String>>,
         removals: Option<Vec<String>>,
-    ) -> Result<(), Error>;
+    ) -> Result<(), IcebergError>;
     /// Check if a namespace exists
-    async fn namespace_exists(&self, namespace: &Namespace) -> Result<bool, Error>;
+    async fn namespace_exists(&self, namespace: &Namespace) -> Result<bool, IcebergError>;
     /// Lists all tables in the given namespace.
-    async fn list_tabulars(&self, namespace: &Namespace) -> Result<Vec<Identifier>, Error>;
+    async fn list_tabulars(&self, namespace: &Namespace) -> Result<Vec<Identifier>, IcebergError>;
     /// Lists all namespaces in the catalog.
-    async fn list_namespaces(&self, parent: Option<&str>) -> Result<Vec<Namespace>, Error>;
+    async fn list_namespaces(&self, parent: Option<&str>) -> Result<Vec<Namespace>, IcebergError>;
     /// Check if a table exists
-    async fn tabular_exists(&self, identifier: &Identifier) -> Result<bool, Error>;
+    async fn tabular_exists(&self, identifier: &Identifier) -> Result<bool, IcebergError>;
     /// Drop a table and delete all data and metadata files.
-    async fn drop_table(&self, identifier: &Identifier) -> Result<(), Error>;
+    async fn drop_table(&self, identifier: &Identifier) -> Result<(), IcebergError>;
     /// Drop a table and delete all data and metadata files.
-    async fn drop_view(&self, identifier: &Identifier) -> Result<(), Error>;
+    async fn drop_view(&self, identifier: &Identifier) -> Result<(), IcebergError>;
     /// Drop a table and delete all data and metadata files.
-    async fn drop_materialized_view(&self, identifier: &Identifier) -> Result<(), Error>;
+    async fn drop_materialized_view(&self, identifier: &Identifier) -> Result<(), IcebergError>;
     /// Load a table.
-    async fn load_tabular(self: Arc<Self>, identifier: &Identifier) -> Result<Tabular, Error>;
+    async fn load_tabular(self: Arc<Self>, identifier: &Identifier) -> Result<Tabular, IcebergError>;
     /// Register a table with the catalog if it doesn't exist.
     async fn create_table(
         self: Arc<Self>,
         identifier: Identifier,
         metadata: TableMetadata,
-    ) -> Result<Table, Error>;
+    ) -> Result<Table, IcebergError>;
     /// Register a view with the catalog if it doesn't exist.
     async fn create_view(
         self: Arc<Self>,
         identifier: Identifier,
         metadata: ViewMetadata,
-    ) -> Result<View, Error>;
+    ) -> Result<View, IcebergError>;
     /// Register a materialized view with the catalog if it doesn't exist.
     async fn create_materialized_view(
         self: Arc<Self>,
         identifier: Identifier,
         metadata: MaterializedViewMetadata,
-    ) -> Result<MaterializedView, Error>;
+    ) -> Result<MaterializedView, IcebergError>;
     /// perform commit table operation
-    async fn update_table(self: Arc<Self>, commit: CommitTable) -> Result<Table, Error>;
+    async fn update_table(self: Arc<Self>, commit: CommitTable) -> Result<Table, IcebergError>;
     /// perform commit view operation
-    async fn update_view(self: Arc<Self>, commit: CommitView) -> Result<View, Error>;
+    async fn update_view(self: Arc<Self>, commit: CommitView) -> Result<View, IcebergError>;
     /// perform commit view operation
     async fn update_materialized_view(
         self: Arc<Self>,
         commit: CommitView,
-    ) -> Result<MaterializedView, Error>;
+    ) -> Result<MaterializedView, IcebergError>;
     /// Return the associated object store for a bucket
     fn object_store(&self, bucket: Bucket) -> Arc<dyn ObjectStore>;
 }

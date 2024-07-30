@@ -11,7 +11,7 @@ use apache_avro::{types::Value as AvroValue, Reader as AvroReader, Schema as Avr
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use self::_serde::{FieldSummarySerde, ManifestListEntryV1, ManifestListEntryV2};
 
@@ -25,7 +25,7 @@ use super::{
 type ReaderZip<'a, 'metadata, R> = Zip<AvroReader<'a, R>, Repeat<&'metadata TableMetadata>>;
 type ReaderMap<'a, 'metadata, R> = Map<
     ReaderZip<'a, 'metadata, R>,
-    fn((Result<AvroValue, apache_avro::Error>, &TableMetadata)) -> Result<ManifestListEntry, Error>,
+    fn((Result<AvroValue, apache_avro::Error>, &TableMetadata)) -> Result<ManifestListEntry, IcebergError>,
 >;
 
 /// Iterator of ManifestFileEntries
@@ -34,7 +34,7 @@ pub struct ManifestListReader<'a, 'metadata, R: Read> {
 }
 
 impl<'a, 'metadata, R: Read> Iterator for ManifestListReader<'a, 'metadata, R> {
-    type Item = Result<ManifestListEntry, Error>;
+    type Item = Result<ManifestListEntry, IcebergError>;
     fn next(&mut self) -> Option<Self::Item> {
         self.reader.next()
     }
@@ -277,7 +277,7 @@ impl ManifestListEntry {
     pub fn try_from_enum(
         entry: ManifestListEntryEnum,
         table_metadata: &TableMetadata,
-    ) -> Result<ManifestListEntry, Error> {
+    ) -> Result<ManifestListEntry, IcebergError> {
         match entry {
             ManifestListEntryEnum::V2(entry) => {
                 ManifestListEntry::try_from_v2(entry, table_metadata)
@@ -291,7 +291,7 @@ impl ManifestListEntry {
     pub(crate) fn try_from_v2(
         entry: _serde::ManifestListEntryV2,
         table_metadata: &TableMetadata,
-    ) -> Result<ManifestListEntry, Error> {
+    ) -> Result<ManifestListEntry, IcebergError> {
         let partition_types = table_metadata.default_partition_spec()?.data_types(
             table_metadata
                 .current_schema(None)
@@ -299,7 +299,7 @@ impl ManifestListEntry {
                     .refs
                     .values()
                     .next()
-                    .ok_or(Error::NotFound("Current".to_string(), "schema".to_string()))
+                    .ok_or(IcebergError::NotFound("Current".to_string(), "schema".to_string()))
                     .and_then(|x| table_metadata.schema(x.snapshot_id)))
                 .unwrap()
                 .fields(),
@@ -325,7 +325,7 @@ impl ManifestListEntry {
                     v.into_iter()
                         .zip(partition_types.iter())
                         .map(|(x, d)| FieldSummary::try_from(x, d))
-                        .collect::<Result<Vec<_>, Error>>()
+                        .collect::<Result<Vec<_>, IcebergError>>()
                 })
                 .transpose()?,
             key_metadata: entry.key_metadata,
@@ -335,7 +335,7 @@ impl ManifestListEntry {
     pub(crate) fn try_from_v1(
         entry: _serde::ManifestListEntryV1,
         table_metadata: &TableMetadata,
-    ) -> Result<ManifestListEntry, Error> {
+    ) -> Result<ManifestListEntry, IcebergError> {
         let partition_types = table_metadata.default_partition_spec()?.data_types(
             table_metadata
                 .current_schema(None)
@@ -343,7 +343,7 @@ impl ManifestListEntry {
                     .refs
                     .values()
                     .next()
-                    .ok_or(Error::NotFound("Current".to_string(), "schema".to_string()))
+                    .ok_or(IcebergError::NotFound("Current".to_string(), "schema".to_string()))
                     .and_then(|x| table_metadata.schema(x.snapshot_id)))
                 .unwrap()
                 .fields(),
@@ -369,7 +369,7 @@ impl ManifestListEntry {
                     v.into_iter()
                         .zip(partition_types.iter())
                         .map(|(x, d)| FieldSummary::try_from(x, d))
-                        .collect::<Result<Vec<_>, Error>>()
+                        .collect::<Result<Vec<_>, IcebergError>>()
                 })
                 .transpose()?,
             key_metadata: entry.key_metadata,
@@ -378,7 +378,7 @@ impl ManifestListEntry {
 }
 
 impl FieldSummary {
-    fn try_from(value: _serde::FieldSummarySerde, data_type: &Type) -> Result<Self, Error> {
+    fn try_from(value: _serde::FieldSummarySerde, data_type: &Type) -> Result<Self, IcebergError> {
         Ok(FieldSummary {
             contains_null: value.contains_null,
             contains_nan: value.contains_nan,
@@ -396,7 +396,7 @@ impl FieldSummary {
 
 impl ManifestListEntry {
     /// Get schema of the manifest list
-    pub fn schema(format_version: &FormatVersion) -> Result<AvroSchema, Error> {
+    pub fn schema(format_version: &FormatVersion) -> Result<AvroSchema, IcebergError> {
         let schema = match format_version {
             FormatVersion::V1 => r#"
         {
@@ -673,7 +673,7 @@ impl ManifestListEntry {
 /// Convert an avro value to a [ManifestFile] according to the provided format version
 pub(crate) fn avro_value_to_manifest_file(
     value: (Result<AvroValue, apache_avro::Error>, &TableMetadata),
-) -> Result<ManifestListEntry, Error> {
+) -> Result<ManifestListEntry, IcebergError> {
     let entry = value.0?;
     let table_metadata = value.1;
     match table_metadata.format_version {

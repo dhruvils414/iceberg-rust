@@ -14,7 +14,7 @@ use std::{
 
 use crate::{
     catalog::commit::{ViewRequirement, ViewUpdate},
-    error::Error,
+    error::IcebergError,
 };
 
 /// View operation
@@ -37,7 +37,7 @@ impl Operation {
     pub async fn execute<T: Clone + Default>(
         self,
         metadata: &GeneralViewMetadata<T>,
-    ) -> Result<(Option<ViewRequirement>, Vec<ViewUpdate>), Error> {
+    ) -> Result<(Option<ViewRequirement>, Vec<ViewUpdate>), IcebergError> {
         match self {
             Operation::UpdateRepresentation {
                 representation,
@@ -82,7 +82,7 @@ impl Operation {
                                 .with_schema_id(schema_id)
                                 .with_fields(schema)
                                 .build()
-                                .map_err(iceberg_rust_spec::error::Error::from)?,
+                                .map_err(iceberg_rust_spec::error::IcebergError::from)?,
                             last_column_id: Some(last_column_id),
                         },
                         ViewUpdate::SetProperties {

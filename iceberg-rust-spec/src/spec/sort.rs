@@ -6,7 +6,7 @@ use std::{fmt, str};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::partition::Transform;
 
@@ -70,9 +70,9 @@ impl fmt::Display for SortOrder {
 }
 
 impl str::FromStr for SortOrder {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 

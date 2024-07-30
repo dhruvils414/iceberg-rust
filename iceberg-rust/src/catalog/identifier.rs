@@ -6,7 +6,7 @@ use core::fmt::{self, Display};
 
 use serde_derive::{Deserialize, Serialize};
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::namespace::Namespace;
 
@@ -22,12 +22,12 @@ pub struct Identifier {
 
 impl Identifier {
     ///Create Identifier
-    pub fn try_new(names: &[String]) -> Result<Self, Error> {
+    pub fn try_new(names: &[String]) -> Result<Self, IcebergError> {
         let length = names.len();
         if names.is_empty() {
-            Err(Error::InvalidFormat("identifier sequence".to_string()))
+            Err(IcebergError::InvalidFormat("identifier sequence".to_string()))
         } else if names[length - 1].is_empty() {
-            Err(Error::InvalidFormat("table name".to_string()))
+            Err(IcebergError::InvalidFormat("table name".to_string()))
         } else {
             Ok(Identifier {
                 namespace: Namespace::try_new(&names[0..length - 1])?,
@@ -36,7 +36,7 @@ impl Identifier {
         }
     }
     ///Parse
-    pub fn parse(identifier: &str) -> Result<Self, Error> {
+    pub fn parse(identifier: &str) -> Result<Self, IcebergError> {
         let names = identifier
             .split(SEPARATOR)
             .map(|x| x.to_string())
@@ -60,7 +60,7 @@ impl Display for Identifier {
 }
 
 impl TryFrom<&str> for Identifier {
-    type Error = Error;
+    type Error = IcebergError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::parse(value)
     }

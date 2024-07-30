@@ -17,7 +17,7 @@ use iceberg_rust_spec::spec::{
 
 use crate::{
     catalog::{identifier::Identifier, Catalog},
-    error::Error,
+    error::IcebergError,
 };
 
 use super::MaterializedView;
@@ -54,7 +54,7 @@ impl MaterializedViewBuilder {
         identifier: impl ToString,
         schema: Schema,
         catalog: Arc<dyn Catalog>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         let mut builder = MaterializedViewMetadataBuilder::default();
         builder
             .with_schema((1, schema))
@@ -88,7 +88,7 @@ impl MaterializedViewBuilder {
     }
 
     /// Building a materialized view writes the metadata file to the object store and commits the table to the metastore
-    pub async fn build(self) -> Result<MaterializedView, Error> {
+    pub async fn build(self) -> Result<MaterializedView, IcebergError> {
         let metadata = self.metadata.build()?;
         let schema_id = &metadata.current_version(None)?.schema_id;
         let table_metadata = TableMetadataBuilder::default()
@@ -98,7 +98,7 @@ impl MaterializedViewBuilder {
                 metadata
                     .schemas
                     .get(schema_id)
-                    .ok_or(Error::InvalidFormat("schema in metadata".to_string()))?
+                    .ok_or(IcebergError::InvalidFormat("schema in metadata".to_string()))?
                     .clone(),
             ))
             .current_schema_id(*schema_id)

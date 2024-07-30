@@ -3,6 +3,32 @@ name = "iceberg-glue"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Apache Glue catalog for Apache Iceberg tables"
+
+license = "Apache-2.0"
+
+repository = "https://github.com/JanKaul/iceberg-rust"
 
 [dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+aws-config = { workspace = true }
+aws-sdk-glue = { workspace = true }
+log = { workspace = true }
+iceberg-rust = { path = "../iceberg-rust", version = "0.3.0" }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+typed-builder = { workspace = true }
+uuid = { workspace = true }
+chrono = "0.4.34"
+rust_decimal = "1.31.0"
+reqwest = { version = "^0.12", default-features = false, features = ["json"] }
+pretty_assertions = "1.4.0"
+parquet = "52"
+url = "2"
+opendal = "0.47"
+apache-avro = "0.16"
+
+[dev-dependencies]
+ctor = { workspace = true }
+port_scanner = { workspace = true }

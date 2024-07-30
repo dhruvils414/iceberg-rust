@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::table::Table;
-use crate::{catalog::identifier::Identifier, error::Error};
+use crate::{catalog::identifier::Identifier, error::IcebergError};
 use iceberg_rust_spec::spec::table_metadata::TableMetadataBuilder;
 
 use super::Catalog;
@@ -35,7 +35,7 @@ impl DerefMut for TableBuilder {
 
 impl TableBuilder {
     /// Creates a new [TableBuilder] to create a Metastore Table with some default metadata entries already set.
-    pub fn new(identifier: impl ToString, catalog: Arc<dyn Catalog>) -> Result<Self, Error> {
+    pub fn new(identifier: impl ToString, catalog: Arc<dyn Catalog>) -> Result<Self, IcebergError> {
         Ok(TableBuilder {
             metadata: TableMetadataBuilder::default(),
             catalog,
@@ -43,7 +43,7 @@ impl TableBuilder {
         })
     }
     /// Building a table writes the metadata file and commits the table to either the metastore or the filesystem
-    pub async fn build(&mut self) -> Result<Table, Error> {
+    pub async fn build(&mut self) -> Result<Table, IcebergError> {
         // Create metadata
         let mut metadata = self.metadata.build()?;
         let last_column_id = metadata

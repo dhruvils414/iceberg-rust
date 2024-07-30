@@ -5,7 +5,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use iceberg_rust::{
     catalog::{identifier::Identifier, namespace::Namespace, tabular::Tabular, Catalog},
-    error::Error as IcebergError,
+    error::IcebergError,
 };
 use iceberg_rust_spec::spec::{tabular::TabularMetadata, view_metadata::REF_PREFIX};
 

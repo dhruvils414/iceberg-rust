@@ -11,12 +11,12 @@ use std::{
 use crate::spec::types::{PrimitiveType, StructField, StructType, Type};
 use arrow_schema::{DataType, Field, Fields, Schema as ArrowSchema, TimeUnit};
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 pub const PARQUET_FIELD_ID_META_KEY: &str = "PARQUET:field_id";
 
 impl TryInto<ArrowSchema> for &StructType {
-    type Error = Error;
+    type Error = IcebergError;
 
     fn try_into(self) -> Result<ArrowSchema, Self::Error> {
         let fields = self
@@ -34,14 +34,14 @@ impl TryInto<ArrowSchema> for &StructType {
                     field.id.to_string(),
                 )])))
             })
-            .collect::<Result<_, Error>>()?;
+            .collect::<Result<_, IcebergError>>()?;
         let metadata = HashMap::new();
         Ok(ArrowSchema { fields, metadata })
     }
 }
 
 impl TryFrom<&ArrowSchema> for StructType {
-    type Error = Error;
+    type Error = IcebergError;
 
     fn try_from(value: &ArrowSchema) -> Result<Self, Self::Error> {
         let mut ids = HashSet::new();
@@ -70,13 +70,13 @@ impl TryFrom<&ArrowSchema> for StructType {
                     doc: None,
                 })
             })
-            .collect::<Result<_, Error>>()?;
+            .collect::<Result<_, IcebergError>>()?;
         Ok(StructType::new(fields))
     }
 }
 
 impl TryFrom<&Type> for DataType {
-    type Error = Error;
+    type Error = IcebergError;
 
     fn try_from(value: &Type) -> Result<Self, Self::Error> {
         match value {
@@ -120,7 +120,7 @@ impl TryFrom<&Type> for DataType {
                             false,
                         ))
                     })
-                    .collect::<Result<_, Error>>()?,
+                    .collect::<Result<_, IcebergError>>()?,
             )),
             Type::Map(map) => Ok(DataType::Map(
                 Arc::new(Field::new_dict(
@@ -152,7 +152,7 @@ impl TryFrom<&Type> for DataType {
 }
 
 impl TryFrom<&DataType> for Type {
-    type Error = Error;
+    type Error = IcebergError;
 
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         match value {
@@ -173,7 +173,7 @@ impl TryFrom<&DataType> for Type {
                 Ok(Type::Primitive(PrimitiveType::Fixed(*len as u64)))
             }
             DataType::Binary => Ok(Type::Primitive(PrimitiveType::Binary)),
-            _ => Err(Error::NotSupported("datatype to arrow".to_string())),
+            _ => Err(IcebergError::NotSupported("datatype to arrow".to_string())),
         }
     }
 }

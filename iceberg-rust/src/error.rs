@@ -7,7 +7,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 /// Iceberg error
-pub enum Error {
+pub enum IcebergError {
     /// Invalid format
     #[error("{0} doesn't have the right format")]
     InvalidFormat(String),
@@ -28,7 +28,7 @@ pub enum Error {
     NotSupported(String),
     /// Iceberg spec error
     #[error(transparent)]
-    Iceberg(#[from] iceberg_rust_spec::error::Error),
+    Iceberg(#[from] iceberg_rust_spec::error::IcebergError),
     /// Arrow error
     #[error(transparent)]
     Arrow(#[from] arrow::error::ArrowError),
@@ -92,8 +92,8 @@ pub enum Error {
     VersionBuilder(#[from] iceberg_rust_spec::spec::view_metadata::VersionBuilderError),
 }
 
-impl From<Error> for ArrowError {
-    fn from(value: Error) -> Self {
+impl From<IcebergError> for ArrowError {
+    fn from(value: IcebergError) -> Self {
         ArrowError::from_external_error(Box::new(value))
     }
 }

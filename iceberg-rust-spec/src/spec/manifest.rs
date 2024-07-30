@@ -19,7 +19,7 @@ use serde_bytes::ByteBuf;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
-    error::Error,
+    error::IcebergError,
     spec::schema::{SchemaV1, SchemaV2},
 };
 
@@ -39,7 +39,7 @@ type ReaderMap<'a, R> = Map<
             Result<AvroValue, apache_avro::Error>,
             Arc<(Schema, PartitionSpec, FormatVersion)>,
         ),
-    ) -> Result<ManifestEntry, Error>,
+    ) -> Result<ManifestEntry, IcebergError>,
 >;
 
 /// Iterator of ManifestFileEntries
@@ -48,7 +48,7 @@ pub struct ManifestReader<'a, R: Read> {
 }
 
 impl<'a, R: Read> Iterator for ManifestReader<'a, R> {
-    type Item = Result<ManifestEntry, Error>;
+    type Item = Result<ManifestEntry, IcebergError>;
     fn next(&mut self) -> Option<Self::Item> {
         self.reader.next()
     }
@@ -56,7 +56,7 @@ impl<'a, R: Read> Iterator for ManifestReader<'a, R> {
 
 impl<'a, R: Read> ManifestReader<'a, R> {
     /// Create a new ManifestFile reader
-    pub fn new(reader: R) -> Result<Self, Error> {
+    pub fn new(reader: R) -> Result<Self, IcebergError> {
         let reader = AvroReader::new(reader)?;
         let metadata = reader.user_metadata();
 
@@ -69,26 +69,26 @@ impl<'a, R: Read> ManifestReader<'a, R> {
         {
             "1" => Ok(FormatVersion::V1),
             "2" => Ok(FormatVersion::V2),
-            _ => Err(Error::InvalidFormat("format version".to_string())),
+            _ => Err(IcebergError::InvalidFormat("format version".to_string())),
         }?;
 
         let schema: Schema = match format_version {
             FormatVersion::V1 => TryFrom::<SchemaV1>::try_from(serde_json::from_slice(
                 metadata
                     .get("schema")
-                    .ok_or(Error::InvalidFormat("manifest metadata".to_string()))?,
+                    .ok_or(IcebergError::InvalidFormat("manifest metadata".to_string()))?,
             )?)?,
             FormatVersion::V2 => TryFrom::<SchemaV2>::try_from(serde_json::from_slice(
                 metadata
                     .get("schema")
-                    .ok_or(Error::InvalidFormat("manifest metadata".to_string()))?,
+                    .ok_or(IcebergError::InvalidFormat("manifest metadata".to_string()))?,
             )?)?,
         };
 
         let partition_fields: Vec<PartitionField> = serde_json::from_slice(
             metadata
                 .get("partition-spec")
-                .ok_or(Error::InvalidFormat("manifest metadata".to_string()))?,
+                .ok_or(IcebergError::InvalidFormat("manifest metadata".to_string()))?,
         )?;
         let spec_id: i32 = metadata
             .get("partition-spec-id")
@@ -130,7 +130,7 @@ impl<'a, W: std::io::Write> ManifestWriter<'a, W> {
         schema: &'a AvroSchema,
         table_metadata: &TableMetadata,
         branch: Option<&str>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         let mut avro_writer = AvroWriter::new(schema, writer);
 
         avro_writer.add_user_metadata(
@@ -166,7 +166,7 @@ impl<'a, W: std::io::Write> ManifestWriter<'a, W> {
         Ok(ManifestWriter(avro_writer))
     }
 
-    pub fn into_inner(self) -> Result<W, Error> {
+    pub fn into_inner(self) -> Result<W, IcebergError> {
         Ok(self.0.into_inner()?)
     }
 }
@@ -200,7 +200,7 @@ impl ManifestEntry {
         value: ManifestEntryV2,
         schema: &Schema,
         partition_spec: &PartitionSpec,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(ManifestEntry {
             format_version: FormatVersion::V2,
             status: value.status,
@@ -214,7 +214,7 @@ impl ManifestEntry {
         value: ManifestEntryV1,
         schema: &Schema,
         partition_spec: &PartitionSpec,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(ManifestEntry {
             format_version: FormatVersion::V2,
             status: value.status,
@@ -307,7 +307,7 @@ impl ManifestEntry {
     pub fn schema(
         partition_schema: &str,
         format_version: &FormatVersion,
-    ) -> Result<AvroSchema, Error> {
+    ) -> Result<AvroSchema, IcebergError> {
         let schema = match format_version {
             FormatVersion::V1 => {
                 let datafile_schema = DataFileV1::schema(partition_schema);
@@ -406,13 +406,13 @@ pub enum Content {
 }
 
 impl TryFrom<Vec<u8>> for Content {
-    type Error = Error;
+    type Error = IcebergError;
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         match String::from_utf8(value)?.to_uppercase().as_str() {
             "DATA" => Ok(Content::Data),
             "POSITION DELETES" => Ok(Content::PositionDeletes),
             "EQUALITY DELETES" => Ok(Content::EqualityDeletes),
-            _ => Err(Error::Conversion(
+            _ => Err(IcebergError::Conversion(
                 "string".to_string(),
                 "content".to_string(),
             )),
@@ -482,7 +482,7 @@ impl<'de> Deserialize<'de> for FileFormat {
 pub fn partition_value_schema(
     spec: &[PartitionField],
     table_schema: &Schema,
-) -> Result<String, Error> {
+) -> Result<String, IcebergError> {
     Ok(spec
         .iter()
         .map(|field| {
@@ -490,10 +490,10 @@ pub fn partition_value_schema(
                 .fields()
                 .get(*field.source_id() as usize)
                 .ok_or_else(|| {
-                    Error::Schema(field.name().to_string(), format!("{:?}", &table_schema))
+                    IcebergError::Schema(field.name().to_string(), format!("{:?}", &table_schema))
                 })?;
             let data_type = avro_schema_datatype(&schema_field.field_type);
-            Ok::<_, Error>(
+            Ok::<_, IcebergError>(
                 r#"
                 {
                     "name": ""#
@@ -514,7 +514,7 @@ pub fn partition_value_schema(
             r#"{"type": "record","name": "r102","fields": ["#.to_owned(),
             |acc, x| {
                 let result = acc + &x?;
-                Ok::<_, Error>(result)
+                Ok::<_, IcebergError>(result)
             },
         )?
         .trim_end_matches(',')
@@ -593,7 +593,7 @@ impl<'de, T: Serialize + DeserializeOwned + Clone> Deserialize<'de> for AvroMap<
 }
 
 impl AvroMap<ByteBuf> {
-    fn into_value_map(self, schema: &StructType) -> Result<HashMap<i32, Value>, Error> {
+    fn into_value_map(self, schema: &StructType) -> Result<HashMap<i32, Value>, IcebergError> {
         Ok(HashMap::from_iter(
             self.0
                 .into_iter()
@@ -604,12 +604,12 @@ impl AvroMap<ByteBuf> {
                             &v,
                             &schema
                                 .get(k as usize)
-                                .ok_or(Error::Schema(k.to_string(), format!("{:?}", schema)))?
+                                .ok_or(IcebergError::Schema(k.to_string(), format!("{:?}", schema)))?
                                 .field_type,
                         )?,
                     ))
                 })
-                .collect::<Result<Vec<_>, Error>>()?,
+                .collect::<Result<Vec<_>, IcebergError>>()?,
         ))
     }
 }
@@ -677,7 +677,7 @@ impl DataFile {
         value: DataFileV2,
         schema: &Schema,
         partition_spec: &PartitionSpec,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(DataFile {
             content: value.content,
             file_path: value.file_path,
@@ -711,7 +711,7 @@ impl DataFile {
         value: DataFileV1,
         schema: &Schema,
         partition_spec: &PartitionSpec,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(DataFile {
             content: Content::Data,
             file_path: value.file_path,
@@ -1481,7 +1481,7 @@ fn avro_value_to_manifest_entry(
         Result<AvroValue, apache_avro::Error>,
         Arc<(Schema, PartitionSpec, FormatVersion)>,
     ),
-) -> Result<ManifestEntry, Error> {
+) -> Result<ManifestEntry, IcebergError> {
     let entry = value.0?;
     let schema = &value.1 .0;
     let partition_spec = &value.1 .1;

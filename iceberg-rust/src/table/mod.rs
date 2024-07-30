@@ -17,7 +17,7 @@ use iceberg_rust_spec::util::{self};
 
 use crate::{
     catalog::{bucket::parse_bucket, identifier::Identifier, Catalog},
-    error::Error,
+    error::IcebergError,
     table::transaction::TableTransaction,
 };
 
@@ -40,7 +40,7 @@ impl Table {
         identifier: Identifier,
         catalog: Arc<dyn Catalog>,
         metadata: TableMetadata,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(Table {
             identifier,
             catalog,
@@ -65,8 +65,8 @@ impl Table {
     }
     #[inline]
     /// Get the schema of the table for a given branch. Defaults to main.
-    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, Error> {
-        self.metadata.current_schema(branch).map_err(Error::from)
+    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, IcebergError> {
+        self.metadata.current_schema(branch).map_err(IcebergError::from)
     }
     #[inline]
     /// Get the metadata of the table
@@ -83,7 +83,7 @@ impl Table {
         &self,
         start: Option<i64>,
         end: Option<i64>,
-    ) -> Result<Vec<ManifestListEntry>, Error> {
+    ) -> Result<Vec<ManifestListEntry>, IcebergError> {
         let metadata = self.metadata();
         let end_snapshot = match end.and_then(|id| metadata.snapshots.get(&id)) {
             Some(snapshot) => snapshot,
@@ -126,11 +126,11 @@ impl Table {
                         true
                     }
                 })
-                .collect::<Result<_, iceberg_rust_spec::error::Error>>()
-                .map_err(Error::from),
+                .collect::<Result<_, iceberg_rust_spec::error::IcebergError>>()
+                .map_err(IcebergError::from),
             None => iter
-                .collect::<Result<_, iceberg_rust_spec::error::Error>>()
-                .map_err(Error::from),
+                .collect::<Result<_, iceberg_rust_spec::error::IcebergError>>()
+                .map_err(IcebergError::from),
         }
     }
     /// Get list of datafiles corresponding to the given manifest files
@@ -139,7 +139,7 @@ impl Table {
         &self,
         manifests: &[ManifestListEntry],
         filter: Option<Vec<bool>>,
-    ) -> Result<Vec<ManifestEntry>, Error> {
+    ) -> Result<Vec<ManifestEntry>, IcebergError> {
         datafiles(self.object_store(), manifests, filter).await
     }
     /// Check if datafiles contain deletes
@@ -147,7 +147,7 @@ impl Table {
         &self,
         start: Option<i64>,
         end: Option<i64>,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, IcebergError> {
         let manifests = self.manifests(start, end).await?;
         let datafiles = self.datafiles(&manifests, None).await?;
         Ok(datafiles
@@ -164,7 +164,7 @@ async fn datafiles(
     object_store: Arc<dyn ObjectStore>,
     manifests: &[ManifestListEntry],
     filter: Option<Vec<bool>>,
-) -> Result<Vec<ManifestEntry>, Error> {
+) -> Result<Vec<ManifestEntry>, IcebergError> {
     // filter manifest files according to filter vector
     let iter = match filter {
         Some(predicate) => manifests
@@ -200,7 +200,7 @@ async fn datafiles(
         .flat_map(|reader| reader.try_flatten_stream())
         .try_collect()
         .await
-        .map_err(Error::from)?;
+        .map_err(IcebergError::from)?;
 
     Ok(datafiles)
 }
@@ -209,19 +209,19 @@ async fn datafiles(
 pub(crate) async fn delete_files(
     metadata: &TableMetadata,
     object_store: Arc<dyn ObjectStore>,
-) -> Result<(), Error> {
+) -> Result<(), IcebergError> {
     let Some(snapshot) = metadata.current_snapshot(None)? else {
         return Ok(());
     };
     let manifests = snapshot
         .manifests(metadata, object_store.clone())
         .await?
-        .collect::<Result<Vec<_>, iceberg_rust_spec::error::Error>>()?;
+        .collect::<Result<Vec<_>, iceberg_rust_spec::error::IcebergError>>()?;
     let datafiles = datafiles(object_store.clone(), &manifests, None).await?;
     let snapshots = &metadata.snapshots;
 
     stream::iter(datafiles.into_iter())
-        .map(Ok::<_, Error>)
+        .map(Ok::<_, IcebergError>)
         .try_for_each_concurrent(None, |datafile| {
             let object_store = object_store.clone();
             async move {
@@ -234,7 +234,7 @@ pub(crate) async fn delete_files(
         .await?;
 
     stream::iter(manifests.into_iter())
-        .map(Ok::<_, Error>)
+        .map(Ok::<_, IcebergError>)
         .try_for_each_concurrent(None, |manifest| {
             let object_store = object_store.clone();
             async move {
@@ -245,7 +245,7 @@ pub(crate) async fn delete_files(
         .await?;
 
     stream::iter(snapshots.values())
-        .map(Ok::<_, Error>)
+        .map(Ok::<_, IcebergError>)
         .try_for_each_concurrent(None, |snapshot| {
             let object_store = object_store.clone();
             async move {

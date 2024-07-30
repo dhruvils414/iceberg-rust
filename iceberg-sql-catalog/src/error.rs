@@ -1,4 +1,4 @@
-use iceberg_rust::error::Error as IcebergError;
+use iceberg_rust::error::IcebergError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

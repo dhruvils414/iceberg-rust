@@ -6,7 +6,7 @@ use std::{fmt, str};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::{
     materialized_view_metadata::MaterializedViewMetadata, table_metadata::TableMetadata,
@@ -48,9 +48,9 @@ impl fmt::Display for TabularMetadata {
 }
 
 impl str::FromStr for TabularMetadata {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 

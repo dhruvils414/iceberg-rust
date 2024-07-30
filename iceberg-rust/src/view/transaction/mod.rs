@@ -5,7 +5,7 @@
 pub mod operation;
 use iceberg_rust_spec::spec::{types::StructType, view_metadata::ViewRepresentation};
 
-use crate::{catalog::commit::CommitView, error::Error};
+use crate::{catalog::commit::CommitView, error::IcebergError};
 
 use self::operation::Operation as ViewOperation;
 
@@ -47,7 +47,7 @@ impl<'view> Transaction<'view> {
         self
     }
     /// Commit the transaction to perform the [Operation]s with ACID guarantees.
-    pub async fn commit(self) -> Result<(), Error> {
+    pub async fn commit(self) -> Result<(), IcebergError> {
         let catalog = self.view.catalog();
 
         let identifier = self.view.identifier().clone();

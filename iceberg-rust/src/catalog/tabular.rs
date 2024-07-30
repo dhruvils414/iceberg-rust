@@ -7,7 +7,7 @@ use std::sync::Arc;
 use iceberg_rust_spec::spec::tabular::TabularMetadata;
 use object_store::ObjectStore;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 use crate::materialized_view::MaterializedView;
 use crate::table::Table;
 use crate::view::View;
@@ -61,7 +61,7 @@ impl Tabular {
     }
 
     /// Reload relation from catalog
-    pub async fn reload(&mut self) -> Result<(), Error> {
+    pub async fn reload(&mut self) -> Result<(), IcebergError> {
         match self {
             Tabular::Table(table) => {
                 let new = if let Tabular::Table(table) =
@@ -69,7 +69,7 @@ impl Tabular {
                 {
                     Ok(table)
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Tabular type from catalog response".to_string(),
                     ))
                 }?;
@@ -81,7 +81,7 @@ impl Tabular {
                 {
                     Ok(view)
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Tabular type from catalog response".to_string(),
                     ))
                 }?;
@@ -93,7 +93,7 @@ impl Tabular {
                 {
                     Ok(matview)
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Tabular type from catalog response".to_string(),
                     ))
                 }?;
@@ -108,7 +108,7 @@ impl Tabular {
 pub async fn get_tabular_metadata(
     metadata_location: &str,
     object_store: Arc<dyn ObjectStore>,
-) -> Result<TabularMetadata, Error> {
+) -> Result<TabularMetadata, IcebergError> {
     let bytes = object_store
         .get(&metadata_location.into())
         .await?

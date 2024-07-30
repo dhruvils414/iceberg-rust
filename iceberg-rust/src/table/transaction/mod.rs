@@ -12,7 +12,7 @@ use iceberg_rust_spec::spec::{
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion_expr::FilterOp;
 
-use crate::{catalog::commit::CommitTable, error::Error, table::Table};
+use crate::{catalog::commit::CommitTable, error::IcebergError, table::Table};
 
 use self::operation::Operation;
 
@@ -157,7 +157,7 @@ impl<'table> TableTransaction<'table> {
         self
     }
     /// Commit the transaction to perform the [Operation]s with ACID guarantees.
-    pub async fn commit(self) -> Result<(), Error> {
+    pub async fn commit(self) -> Result<(), IcebergError> {
         let catalog = self.table.catalog();
         let object_store = self.table.object_store();
         let identifier = self.table.identifier.clone();

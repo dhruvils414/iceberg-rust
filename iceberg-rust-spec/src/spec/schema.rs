@@ -7,7 +7,7 @@ use derive_builder::Builder;
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::types::StructType;
 
@@ -52,14 +52,14 @@ impl fmt::Display for Schema {
 }
 
 impl str::FromStr for Schema {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 
 impl TryFrom<SchemaV2> for Schema {
-    type Error = Error;
+    type Error = IcebergError;
     fn try_from(value: SchemaV2) -> Result<Self, Self::Error> {
         Ok(Schema {
             schema_id: value.schema_id,
@@ -70,7 +70,7 @@ impl TryFrom<SchemaV2> for Schema {
 }
 
 impl TryFrom<SchemaV1> for Schema {
-    type Error = Error;
+    type Error = IcebergError;
     fn try_from(value: SchemaV1) -> Result<Self, Self::Error> {
         Ok(Schema {
             schema_id: value.schema_id.unwrap_or(0),

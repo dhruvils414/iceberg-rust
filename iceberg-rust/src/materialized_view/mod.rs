@@ -11,7 +11,7 @@ use object_store::ObjectStore;
 
 use crate::{
     catalog::{bucket::parse_bucket, identifier::Identifier, tabular::Tabular, Catalog},
-    error::Error,
+    error::IcebergError,
 };
 
 use self::{storage_table::StorageTable, transaction::Transaction as MaterializedViewTransaction};
@@ -49,7 +49,7 @@ impl MaterializedView {
         identifier: Identifier,
         catalog: Arc<dyn Catalog>,
         metadata: MaterializedViewMetadata,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(MaterializedView {
             identifier,
             metadata,
@@ -70,8 +70,8 @@ impl MaterializedView {
             .object_store(parse_bucket(&self.metadata.location).unwrap())
     }
     /// Get the schema of the view
-    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, Error> {
-        self.metadata.current_schema(branch).map_err(Error::from)
+    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, IcebergError> {
+        self.metadata.current_schema(branch).map_err(IcebergError::from)
     }
     /// Get the metadata of the view
     pub fn metadata(&self) -> &MaterializedViewMetadata {
@@ -82,12 +82,12 @@ impl MaterializedView {
         MaterializedViewTransaction::new(self, branch)
     }
     /// Get the storage table of the materialized view
-    pub async fn storage_table(&self) -> Result<StorageTable, Error> {
+    pub async fn storage_table(&self) -> Result<StorageTable, IcebergError> {
         let identifier = Identifier::parse(&self.metadata().properties.storage_table)?;
         if let Tabular::Table(table) = self.catalog().load_tabular(&identifier).await? {
             Ok(StorageTable::new(table))
         } else {
-            Err(Error::InvalidFormat("storage table".to_string()))
+            Err(IcebergError::InvalidFormat("storage table".to_string()))
         }
     }
 }

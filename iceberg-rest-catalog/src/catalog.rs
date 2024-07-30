@@ -12,7 +12,7 @@ use iceberg_rust::{
         tabular::Tabular,
         Catalog,
     },
-    error::Error,
+    error::IcebergError,
     materialized_view::{materialized_view_builder::STORAGE_TABLE_FLAG, MaterializedView},
     spec::{
         materialized_view_metadata::MaterializedViewMetadata,
@@ -63,7 +63,7 @@ impl Catalog for RestCatalog {
         &self,
         namespace: &Namespace,
         properties: Option<HashMap<String, String>>,
-    ) -> Result<HashMap<String, String>, Error> {
+    ) -> Result<HashMap<String, String>, IcebergError> {
         let response = catalog_api_api::create_namespace(
             &self.configuration,
             self.name.as_deref(),
@@ -73,32 +73,32 @@ impl Catalog for RestCatalog {
             },
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         Ok(response.properties.unwrap_or_default())
     }
     /// Drop a namespace in the catalog
-    async fn drop_namespace(&self, namespace: &Namespace) -> Result<(), Error> {
+    async fn drop_namespace(&self, namespace: &Namespace) -> Result<(), IcebergError> {
         catalog_api_api::drop_namespace(
             &self.configuration,
             self.name.as_deref(),
             &namespace.url_encode(),
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         Ok(())
     }
     /// Load the namespace properties from the catalog
     async fn load_namespace(
         &self,
         namespace: &Namespace,
-    ) -> Result<HashMap<String, String>, Error> {
+    ) -> Result<HashMap<String, String>, IcebergError> {
         let response = catalog_api_api::load_namespace_metadata(
             &self.configuration,
             self.name.as_deref(),
             &namespace.url_encode(),
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         Ok(response.properties.unwrap_or_default())
     }
     /// Update the namespace properties in the catalog
@@ -107,7 +107,7 @@ impl Catalog for RestCatalog {
         namespace: &Namespace,
         updates: Option<HashMap<String, String>>,
         removals: Option<Vec<String>>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), IcebergError> {
         catalog_api_api::update_properties(
             &self.configuration,
             self.name.as_deref(),
@@ -115,11 +115,11 @@ impl Catalog for RestCatalog {
             models::UpdateNamespacePropertiesRequest { updates, removals },
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         Ok(())
     }
     /// Check if a namespace exists
-    async fn namespace_exists(&self, namespace: &Namespace) -> Result<bool, Error> {
+    async fn namespace_exists(&self, namespace: &Namespace) -> Result<bool, IcebergError> {
         match catalog_api_api::namespace_exists(
             &self.configuration,
             self.name.as_deref(),
@@ -142,7 +142,7 @@ impl Catalog for RestCatalog {
         }
     }
     /// Lists all tables in the given namespace.
-    async fn list_tabulars(&self, namespace: &Namespace) -> Result<Vec<Identifier>, Error> {
+    async fn list_tabulars(&self, namespace: &Namespace) -> Result<Vec<Identifier>, IcebergError> {
         let tables = catalog_api_api::list_tables(
             &self.configuration,
             self.name.as_deref(),
@@ -151,7 +151,7 @@ impl Catalog for RestCatalog {
             None,
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         let tables = tables.identifiers.unwrap_or(Vec::new()).into_iter();
         let views = catalog_api_api::list_views(
             &self.configuration,
@@ -161,7 +161,7 @@ impl Catalog for RestCatalog {
             None,
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         Ok(views
             .identifiers
             .unwrap_or(Vec::new())
@@ -170,7 +170,7 @@ impl Catalog for RestCatalog {
             .collect())
     }
     /// Lists all namespaces in the catalog.
-    async fn list_namespaces(&self, parent: Option<&str>) -> Result<Vec<Namespace>, Error> {
+    async fn list_namespaces(&self, parent: Option<&str>) -> Result<Vec<Namespace>, IcebergError> {
         let namespaces = catalog_api_api::list_namespaces(
             &self.configuration,
             self.name.as_deref(),
@@ -179,16 +179,16 @@ impl Catalog for RestCatalog {
             parent,
         )
         .await
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         namespaces
             .namespaces
-            .ok_or(Error::NotFound("Namespaces".to_string(), "".to_owned()))?
+            .ok_or(IcebergError::NotFound("Namespaces".to_string(), "".to_owned()))?
             .into_iter()
             .map(|x| Namespace::try_new(&x))
             .collect()
     }
     /// Check if a table exists
-    async fn tabular_exists(&self, identifier: &Identifier) -> Result<bool, Error> {
+    async fn tabular_exists(&self, identifier: &Identifier) -> Result<bool, IcebergError> {
         catalog_api_api::view_exists(
             &self.configuration,
             self.name.as_deref(),
@@ -206,10 +206,10 @@ impl Catalog for RestCatalog {
         })
         .await
         .map(|_| true)
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
     }
     /// Drop a table and delete all data and metadata files.
-    async fn drop_table(&self, identifier: &Identifier) -> Result<(), Error> {
+    async fn drop_table(&self, identifier: &Identifier) -> Result<(), IcebergError> {
         catalog_api_api::drop_table(
             &self.configuration,
             self.name.as_deref(),
@@ -218,10 +218,10 @@ impl Catalog for RestCatalog {
             None,
         )
         .await
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
     }
     /// Drop a table and delete all data and metadata files.
-    async fn drop_view(&self, identifier: &Identifier) -> Result<(), Error> {
+    async fn drop_view(&self, identifier: &Identifier) -> Result<(), IcebergError> {
         catalog_api_api::drop_view(
             &self.configuration,
             self.name.as_deref(),
@@ -229,10 +229,10 @@ impl Catalog for RestCatalog {
             identifier.name(),
         )
         .await
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
     }
     /// Drop a table and delete all data and metadata files.
-    async fn drop_materialized_view(&self, identifier: &Identifier) -> Result<(), Error> {
+    async fn drop_materialized_view(&self, identifier: &Identifier) -> Result<(), IcebergError> {
         catalog_api_api::drop_view(
             &self.configuration,
             self.name.as_deref(),
@@ -240,10 +240,10 @@ impl Catalog for RestCatalog {
             identifier.name(),
         )
         .await
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
     }
     /// Load a table.
-    async fn load_tabular(self: Arc<Self>, identifier: &Identifier) -> Result<Tabular, Error> {
+    async fn load_tabular(self: Arc<Self>, identifier: &Identifier) -> Result<Tabular, IcebergError> {
         // Load View/Matview metadata, is loaded as tabular to enable both possibilities. Must not be table metadata
         let tabular_metadata = catalog_api_api::load_view(
             &self.configuration,
@@ -253,7 +253,7 @@ impl Catalog for RestCatalog {
         )
         .await
         .map(|x| x.metadata)
-        .map_err(Into::<Error>::into)?;
+        .map_err(Into::<IcebergError>::into)?;
         let view_metadata = match *tabular_metadata {
             TabularMetadata::View(view) => Ok(Tabular::View(
                 View::new(identifier.clone(), self.clone(), view).await?,
@@ -261,7 +261,7 @@ impl Catalog for RestCatalog {
             TabularMetadata::MaterializedView(matview) => Ok(Tabular::MaterializedView(
                 MaterializedView::new(identifier.clone(), self.clone(), matview).await?,
             )),
-            TabularMetadata::Table(_) => Err(Error::InvalidFormat(
+            TabularMetadata::Table(_) => Err(IcebergError::InvalidFormat(
                 "Entity returned from load_view cannot be a table.".to_owned(),
             )),
         };
@@ -279,7 +279,7 @@ impl Catalog for RestCatalog {
             )
             .await
             .map(|x| x.metadata)
-            .map_err(Into::<Error>::into)?;
+            .map_err(Into::<IcebergError>::into)?;
 
             Ok(Tabular::Table(
                 Table::new(identifier.clone(), self.clone(), *table_metadata).await?,
@@ -291,7 +291,7 @@ impl Catalog for RestCatalog {
         self: Arc<Self>,
         identifier: Identifier,
         metadata: TableMetadata,
-    ) -> Result<Table, Error> {
+    ) -> Result<Table, IcebergError> {
         let mut request = models::CreateTableRequest::new(
             identifier.name().to_owned(),
             metadata.current_schema(None)?.clone(),
@@ -311,7 +311,7 @@ impl Catalog for RestCatalog {
             request,
             None,
         )
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
         .and_then(|response| {
             let clone = self.clone();
             async move { Table::new(identifier.clone(), clone, *response.metadata).await }
@@ -322,7 +322,7 @@ impl Catalog for RestCatalog {
     async fn update_table(
         self: Arc<Self>,
         commit: iceberg_rust::catalog::commit::CommitTable,
-    ) -> Result<Table, Error> {
+    ) -> Result<Table, IcebergError> {
         let identifier = commit.identifier.clone();
         catalog_api_api::update_table(
             &self.configuration,
@@ -331,7 +331,7 @@ impl Catalog for RestCatalog {
             identifier.name(),
             commit,
         )
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
         .and_then(|response| {
             let clone = self.clone();
             let identifier = identifier.clone();
@@ -343,7 +343,7 @@ impl Catalog for RestCatalog {
         self: Arc<Self>,
         identifier: Identifier,
         metadata: ViewMetadata,
-    ) -> Result<View, Error> {
+    ) -> Result<View, IcebergError> {
         let mut request = models::CreateViewRequest::new(
             identifier.name().to_owned(),
             metadata.current_schema(None)?.clone(),
@@ -357,14 +357,14 @@ impl Catalog for RestCatalog {
             &identifier.namespace().to_string(),
             request,
         )
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
         .and_then(|response| {
             let clone = self.clone();
             async move {
                 if let TabularMetadata::View(metadata) = *response.metadata {
                     View::new(identifier.clone(), clone, metadata).await
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Create view didn't return view metadata.".to_owned(),
                     ))
                 }
@@ -372,7 +372,7 @@ impl Catalog for RestCatalog {
         })
         .await
     }
-    async fn update_view(self: Arc<Self>, commit: CommitView) -> Result<View, Error> {
+    async fn update_view(self: Arc<Self>, commit: CommitView) -> Result<View, IcebergError> {
         let identifier = commit.identifier.clone();
         catalog_api_api::replace_view(
             &self.configuration,
@@ -381,7 +381,7 @@ impl Catalog for RestCatalog {
             identifier.name(),
             commit,
         )
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
         .and_then(|response| {
             let clone = self.clone();
             let identifier = identifier.clone();
@@ -389,7 +389,7 @@ impl Catalog for RestCatalog {
                 if let TabularMetadata::View(metadata) = *response.metadata {
                     View::new(identifier.clone(), clone, metadata).await
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Create view didn't return view metadata.".to_owned(),
                     ))
                 }
@@ -401,7 +401,7 @@ impl Catalog for RestCatalog {
         self: Arc<Self>,
         identifier: Identifier,
         metadata: MaterializedViewMetadata,
-    ) -> Result<MaterializedView, Error> {
+    ) -> Result<MaterializedView, IcebergError> {
         let mut request = models::CreateViewRequest::new(
             identifier.name().to_owned(),
             metadata.current_schema(None)?.clone(),
@@ -415,14 +415,14 @@ impl Catalog for RestCatalog {
             &identifier.namespace().to_string(),
             request,
         )
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
         .and_then(|response| {
             let clone = self.clone();
             async move {
                 if let TabularMetadata::MaterializedView(metadata) = *response.metadata {
                     MaterializedView::new(identifier.clone(), clone, metadata).await
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Create materialzied view didn't return materialized view metadata."
                             .to_owned(),
                     ))
@@ -434,7 +434,7 @@ impl Catalog for RestCatalog {
     async fn update_materialized_view(
         self: Arc<Self>,
         commit: CommitView,
-    ) -> Result<MaterializedView, Error> {
+    ) -> Result<MaterializedView, IcebergError> {
         let identifier = commit.identifier.clone();
         catalog_api_api::replace_view(
             &self.configuration,
@@ -443,7 +443,7 @@ impl Catalog for RestCatalog {
             identifier.name(),
             commit,
         )
-        .map_err(Into::<Error>::into)
+        .map_err(Into::<IcebergError>::into)
         .and_then(|response| {
             let clone = self.clone();
             let identifier = identifier.clone();
@@ -451,7 +451,7 @@ impl Catalog for RestCatalog {
                 if let TabularMetadata::MaterializedView(metadata) = *response.metadata {
                     MaterializedView::new(identifier.clone(), clone, metadata).await
                 } else {
-                    Err(Error::InvalidFormat(
+                    Err(IcebergError::InvalidFormat(
                         "Create materialzied view didn't return materialized view metadata."
                             .to_owned(),
                     ))

@@ -15,7 +15,7 @@ use iceberg_rust::{
         tabular::Tabular,
         Catalog, CatalogList,
     },
-    error::Error as IcebergError,
+    error::IcebergError,
     materialized_view::MaterializedView,
     spec::{
         materialized_view_metadata::MaterializedViewMetadata,

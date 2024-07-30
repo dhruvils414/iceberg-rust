@@ -585,11 +585,11 @@ async fn table_scan(
         .with_fields(
             schema_builder
                 .build()
-                .map_err(iceberg_rust_spec::error::Error::from)
+                .map_err(iceberg_rust_spec::error::IcebergError::from)
                 .map_err(Error::from)?,
         )
         .build()
-        .map_err(iceberg_rust_spec::error::Error::from)
+        .map_err(iceberg_rust_spec::error::IcebergError::from)
         .map_err(Error::from)?;
 
     let file_schema: SchemaRef = Arc::new((file_schema.fields()).try_into().unwrap());

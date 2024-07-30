@@ -31,7 +31,7 @@ use parquet::{
 use uuid::Uuid;
 
 use crate::{
-    catalog::bucket::parse_bucket, error::Error, file_format::parquet::parquet_to_datafile,
+    catalog::bucket::parse_bucket, error::IcebergError, file_format::parquet::parquet_to_datafile,
 };
 
 use super::partition::partition_record_batches;
@@ -46,13 +46,13 @@ pub async fn write_parquet_partitioned(
     branch: Option<&str>,
 ) -> Result<Vec<DataFile>, ArrowError> {
     let location = &metadata.location;
-    let schema = metadata.current_schema(branch).map_err(Error::from)?;
-    let partition_spec = metadata.default_partition_spec().map_err(Error::from)?;
+    let schema = metadata.current_schema(branch).map_err(IcebergError::from)?;
+    let partition_spec = metadata.default_partition_spec().map_err(IcebergError::from)?;
 
     let streams = partition_record_batches(batches, partition_spec, schema).await?;
 
     let arrow_schema: Arc<ArrowSchema> =
-        Arc::new((schema.fields()).try_into().map_err(Error::from)?);
+        Arc::new((schema.fields()).try_into().map_err(IcebergError::from)?);
 
     let (sender, reciever) = unbounded();
 
@@ -73,7 +73,7 @@ pub async fn write_parquet_partitioned(
                     object_store.clone(),
                 )
                 .await?;
-                sender.send(files).await.map_err(Error::from)?;
+                sender.send(files).await.map_err(IcebergError::from)?;
                 Ok(())
             }
         })

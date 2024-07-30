@@ -9,7 +9,7 @@ use object_store::{
     ObjectStore,
 };
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 /// Type for buckets for different cloud providers
 pub enum Bucket<'s> {
@@ -32,19 +32,19 @@ impl<'s> Display for Bucket<'s> {
 }
 
 /// Get the bucket and coud provider from the location string
-pub fn parse_bucket(path: &str) -> Result<Bucket, Error> {
+pub fn parse_bucket(path: &str) -> Result<Bucket, IcebergError> {
     if path.starts_with("s3://") {
         path.trim_start_matches("s3://")
             .split('/')
             .next()
             .map(Bucket::S3)
-            .ok_or(Error::NotFound("Table".to_string(), "location".to_string()))
+            .ok_or(IcebergError::NotFound("Table".to_string(), "location".to_string()))
     } else if path.starts_with("gcs://") {
         path.trim_start_matches("gcs://")
             .split('/')
             .next()
             .map(Bucket::GCS)
-            .ok_or(Error::NotFound("Table".to_string(), "location".to_string()))
+            .ok_or(IcebergError::NotFound("Table".to_string(), "location".to_string()))
     } else {
         Ok(Bucket::Local)
     }
@@ -65,25 +65,25 @@ pub enum ObjectStoreBuilder {
 
 impl ObjectStoreBuilder {
     /// Create objectstore from template
-    pub fn build(&self, bucket: Bucket) -> Result<Arc<dyn ObjectStore>, Error> {
+    pub fn build(&self, bucket: Bucket) -> Result<Arc<dyn ObjectStore>, IcebergError> {
         match (bucket, self) {
-            (Bucket::S3(bucket), Self::S3(builder)) => Ok::<_, Error>(Arc::new(
+            (Bucket::S3(bucket), Self::S3(builder)) => Ok::<_, IcebergError>(Arc::new(
                 builder
                     .clone()
                     .with_bucket_name(bucket)
                     .build()
-                    .map_err(Error::from)?,
+                    .map_err(IcebergError::from)?,
             )),
-            (Bucket::GCS(bucket), Self::GCS(builder)) => Ok::<_, Error>(Arc::new(
+            (Bucket::GCS(bucket), Self::GCS(builder)) => Ok::<_, IcebergError>(Arc::new(
                 builder
                     .clone()
                     .with_bucket_name(bucket)
                     .build()
-                    .map_err(Error::from)?,
+                    .map_err(IcebergError::from)?,
             )),
             (Bucket::Local, Self::Filesystem(object_store)) => Ok(object_store.clone()),
             (Bucket::Local, Self::Memory(object_store)) => Ok(object_store.clone()),
-            _ => Err(Error::NotSupported("Object store protocol".to_owned())),
+            _ => Err(IcebergError::NotSupported("Object store protocol".to_owned())),
         }
     }
 }

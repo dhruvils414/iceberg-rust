@@ -21,7 +21,7 @@ use parquet::{
 };
 use thrift::protocol::{TCompactOutputProtocol, TSerializable};
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 /// Read datafile statistics from parquetfile
 pub fn parquet_to_datafile(
@@ -30,27 +30,27 @@ pub fn parquet_to_datafile(
     file_metadata: &FileMetaData,
     schema: &Schema,
     partition_spec: &[PartitionField],
-) -> Result<DataFile, Error> {
+) -> Result<DataFile, IcebergError> {
     let mut partition = partition_spec
         .iter()
         .map(|x| {
             let field = schema
                 .fields()
                 .get(*x.source_id() as usize)
-                .ok_or_else(|| Error::InvalidFormat("partition column in schema".to_string()))?;
+                .ok_or_else(|| IcebergError::InvalidFormat("partition column in schema".to_string()))?;
             Ok((field.name.clone(), None))
         })
-        .collect::<Result<Struct, Error>>()?;
+        .collect::<Result<Struct, IcebergError>>()?;
     let transforms = partition_spec
         .iter()
         .map(|x| {
             let field = schema
                 .fields()
                 .get(*x.source_id() as usize)
-                .ok_or_else(|| Error::InvalidFormat("partition column in schema".to_string()))?;
+                .ok_or_else(|| IcebergError::InvalidFormat("partition column in schema".to_string()))?;
             Ok((field.name.clone(), x.transform().clone()))
         })
-        .collect::<Result<HashMap<String, Transform>, Error>>()?;
+        .collect::<Result<HashMap<String, Transform>, IcebergError>>()?;
     let parquet_schema = Arc::new(SchemaDescriptor::new(from_thrift(&file_metadata.schema)?));
 
     let mut column_sizes = AvroMap(HashMap::new());
@@ -67,7 +67,7 @@ pub fn parquet_to_datafile(
             let column_name = column.column_descr().name();
             let id = schema
                 .get_name(column_name)
-                .ok_or_else(|| Error::Schema(column_name.to_string(), "".to_string()))?
+                .ok_or_else(|| IcebergError::Schema(column_name.to_string(), "".to_string()))?
                 .id;
             column_sizes
                 .entry(id)
@@ -92,7 +92,7 @@ pub fn parquet_to_datafile(
                 let data_type = &schema
                     .fields()
                     .get(id as usize)
-                    .ok_or_else(|| Error::Schema(column_name.to_string(), "".to_string()))?
+                    .ok_or_else(|| IcebergError::Schema(column_name.to_string(), "".to_string()))?
                     .field_type;
 
                 if let Type::Primitive(_) = &data_type {
@@ -205,7 +205,7 @@ pub fn parquet_to_datafile(
                         if partition_value.is_none() {
                             let transform = transforms
                                 .get(column_name)
-                                .ok_or_else(|| Error::InvalidFormat("transform".to_string()))?;
+                                .ok_or_else(|| IcebergError::InvalidFormat("transform".to_string()))?;
                             let min = Value::try_from_bytes(statistics.min_bytes(), data_type)?
                                 .tranform(transform)?;
                             let max = Value::try_from_bytes(statistics.max_bytes(), data_type)?
@@ -234,12 +234,12 @@ pub fn parquet_to_datafile(
         .with_lower_bounds(Some(lower_bounds))
         .with_upper_bounds(Some(upper_bounds))
         .build()
-        .map_err(iceberg_rust_spec::error::Error::from)?;
+        .map_err(iceberg_rust_spec::error::IcebergError::from)?;
     Ok(content)
 }
 
 /// Get parquet metadata size
-pub fn thrift_size<T: TSerializable>(metadata: &T) -> Result<usize, Error> {
+pub fn thrift_size<T: TSerializable>(metadata: &T) -> Result<usize, IcebergError> {
     let mut buffer = TrackedWrite::new(Vec::<u8>::new());
     let mut protocol = TCompactOutputProtocol::new(&mut buffer);
     metadata.write_to_out_protocol(&mut protocol)?;

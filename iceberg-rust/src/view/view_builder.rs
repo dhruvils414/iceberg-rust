@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::catalog::identifier::Identifier;
-use crate::error::Error;
+use crate::error::IcebergError;
 use iceberg_rust_spec::spec::schema::Schema;
 use iceberg_rust_spec::spec::view_metadata::{
     VersionBuilder, ViewMetadataBuilder, ViewProperties, ViewRepresentation, REF_PREFIX,
@@ -43,7 +43,7 @@ impl ViewBuilder {
         identifier: impl ToString,
         schema: Schema,
         catalog: Arc<dyn Catalog>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         let identifier = Identifier::parse(&identifier.to_string())?;
         let mut builder = ViewMetadataBuilder::default();
         builder
@@ -71,7 +71,7 @@ impl ViewBuilder {
         })
     }
     /// Building a table writes the metadata file and commits the table to either the metastore or the filesystem
-    pub async fn build(self) -> Result<View, Error> {
+    pub async fn build(self) -> Result<View, IcebergError> {
         let metadata = self.metadata.build()?;
         self.catalog.create_view(self.identifier, metadata).await
     }

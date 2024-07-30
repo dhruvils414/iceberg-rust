@@ -7,7 +7,7 @@ use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::ops::Deref;
 
-use crate::{catalog::identifier::SEPARATOR, error::Error};
+use crate::{catalog::identifier::SEPARATOR, error::IcebergError};
 
 /// Namespace struct for iceberg catalogs
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -15,9 +15,9 @@ pub struct Namespace(Vec<String>);
 
 impl Namespace {
     /// Try to create new namespace with sequence of strings.
-    pub fn try_new(levels: &[String]) -> Result<Self, Error> {
+    pub fn try_new(levels: &[String]) -> Result<Self, IcebergError> {
         if levels.iter().any(|x| x.is_empty()) {
-            Err(Error::InvalidFormat("namespace sequence".to_string()))
+            Err(IcebergError::InvalidFormat("namespace sequence".to_string()))
         } else {
             Ok(Namespace(levels.to_vec()))
         }
@@ -31,11 +31,11 @@ impl Namespace {
         url::form_urlencoded::byte_serialize(self.0.join("\u{1F}").as_bytes()).collect()
     }
     /// Create namespace from url encoded string
-    pub fn from_url_encoded(namespace: &str) -> Result<Self, Error> {
+    pub fn from_url_encoded(namespace: &str) -> Result<Self, IcebergError> {
         Ok(Namespace(
             url::form_urlencoded::parse(namespace.as_bytes())
                 .next()
-                .ok_or(Error::InvalidFormat(format!(
+                .ok_or(IcebergError::InvalidFormat(format!(
                     "Namespace {} is empty",
                     namespace
                 )))?

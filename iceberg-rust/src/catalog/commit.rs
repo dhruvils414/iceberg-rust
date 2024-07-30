@@ -15,7 +15,7 @@ use iceberg_rust_spec::spec::{
 use serde_derive::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::identifier::Identifier;
 
@@ -311,7 +311,7 @@ pub fn check_view_requirements<T: Clone + Default + Eq + 'static>(
 pub fn apply_table_updates(
     metadata: &mut TableMetadata,
     updates: Vec<TableUpdate>,
-) -> Result<(), Error> {
+) -> Result<(), IcebergError> {
     for update in updates {
         match update {
             TableUpdate::UpgradeFormatVersion { format_version: _ } => {
@@ -384,7 +384,7 @@ pub fn apply_table_updates(
 pub fn apply_view_updates<T: Clone + Default + 'static>(
     metadata: &mut GeneralViewMetadata<T>,
     updates: Vec<ViewUpdate>,
-) -> Result<(), Error> {
+) -> Result<(), IcebergError> {
     for update in updates {
         match update {
             ViewUpdate::UpgradeFormatVersion { format_version: _ } => {
@@ -407,7 +407,7 @@ pub fn apply_view_updates<T: Clone + Default + 'static>(
                     metadata.properties.storage_table = (&materialization as &dyn Any)
                         .downcast_ref::<T>()
                         .cloned()
-                        .ok_or(Error::InvalidFormat(
+                        .ok_or(IcebergError::InvalidFormat(
                             "Materialization must be a string".to_owned(),
                         ))?;
                 }

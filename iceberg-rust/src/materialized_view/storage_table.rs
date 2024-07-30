@@ -5,7 +5,7 @@ use iceberg_rust_spec::spec::{
     snapshot::DEPENDS_ON_TABLES,
 };
 
-use crate::{error::Error, table::Table};
+use crate::{error::IcebergError, table::Table};
 
 pub struct StorageTable(Table);
 
@@ -31,12 +31,12 @@ impl StorageTable {
     pub async fn source_tables(
         &self,
         branch: Option<String>,
-    ) -> Result<Option<Vec<SourceTable>>, Error> {
+    ) -> Result<Option<Vec<SourceTable>>, IcebergError> {
         self.metadata()
             .current_snapshot(branch.as_deref())?
             .and_then(|snapshot| snapshot.summary().other.get(DEPENDS_ON_TABLES))
             .map(|x| depends_on_tables_from_string(x))
             .transpose()
-            .map_err(Error::from)
+            .map_err(IcebergError::from)
     }
 }

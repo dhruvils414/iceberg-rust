@@ -5,7 +5,7 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::view_metadata::{GeneralViewMetadata, GeneralViewMetadataBuilder};
 
@@ -17,20 +17,20 @@ pub type MaterializedViewMetadata = GeneralViewMetadata<String>;
 /// Builder for materialized view metadata
 pub type MaterializedViewMetadataBuilder = GeneralViewMetadataBuilder<String>;
 
-pub fn depends_on_tables_to_string(source_tables: &[SourceTable]) -> Result<String, Error> {
+pub fn depends_on_tables_to_string(source_tables: &[SourceTable]) -> Result<String, IcebergError> {
     Ok(source_tables
         .iter()
         .map(|x| x.identifier.to_string() + "=" + &x.snapshot_id.to_string())
         .join(","))
 }
 
-pub fn depends_on_tables_from_string(value: &str) -> Result<Vec<SourceTable>, Error> {
+pub fn depends_on_tables_from_string(value: &str) -> Result<Vec<SourceTable>, IcebergError> {
     value
         .split(',')
         .map(|x| {
             x.split('=')
                 .next_tuple()
-                .ok_or(Error::InvalidFormat("Lineage information".to_owned()))
+                .ok_or(IcebergError::InvalidFormat("Lineage information".to_owned()))
                 .and_then(|(identifier, snapshot_id)| {
                     Ok(SourceTable {
                         identifier: identifier.to_owned(),
@@ -38,7 +38,7 @@ pub fn depends_on_tables_from_string(value: &str) -> Result<Vec<SourceTable>, Er
                     })
                 })
         })
-        .collect::<Result<_, Error>>()
+        .collect::<Result<_, IcebergError>>()
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -55,7 +55,7 @@ pub struct SourceTable {
 mod tests {
 
     use crate::{
-        error::Error,
+        error::IcebergError,
         spec::materialized_view_metadata::{
             depends_on_tables_from_string, depends_on_tables_to_string, MaterializedViewMetadata,
             SourceTable,
@@ -63,7 +63,7 @@ mod tests {
     };
 
     #[test]
-    fn test_deserialize_materialized_view_metadata_v1() -> Result<(), Error> {
+    fn test_deserialize_materialized_view_metadata_v1() -> Result<(), IcebergError> {
         let data = r#"
         {
         "view-uuid": "fa6506c3-7681-40c8-86dc-e36561f83385",

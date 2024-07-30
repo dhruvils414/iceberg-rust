@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use uuid::Uuid;
 
-use crate::error::Error;
+use crate::error::IcebergError;
 
 use super::schema::Schema;
 
@@ -63,27 +63,27 @@ pub struct GeneralViewMetadata<T: Clone + Default> {
 impl<T: Clone + Default> GeneralViewMetadata<T> {
     /// Get current schema
     #[inline]
-    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, Error> {
+    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, IcebergError> {
         let id = self.current_version(branch)?.schema_id;
         self.schemas
             .get(&id)
-            .ok_or_else(|| Error::InvalidFormat("view metadata".to_string()))
+            .ok_or_else(|| IcebergError::InvalidFormat("view metadata".to_string()))
     }
     /// Get schema for version
     #[inline]
-    pub fn schema(&self, version_id: i64) -> Result<&Schema, Error> {
+    pub fn schema(&self, version_id: i64) -> Result<&Schema, IcebergError> {
         let id = self
             .versions
             .get(&version_id)
-            .ok_or_else(|| Error::NotFound("Version".to_string(), version_id.to_string()))?
+            .ok_or_else(|| IcebergError::NotFound("Version".to_string(), version_id.to_string()))?
             .schema_id;
         self.schemas
             .get(&id)
-            .ok_or_else(|| Error::InvalidFormat("view metadata".to_string()))
+            .ok_or_else(|| IcebergError::InvalidFormat("view metadata".to_string()))
     }
     /// Get current version
     #[inline]
-    pub fn current_version(&self, snapshot_ref: Option<&str>) -> Result<&Version, Error> {
+    pub fn current_version(&self, snapshot_ref: Option<&str>) -> Result<&Version, IcebergError> {
         let version_id: i64 = match snapshot_ref {
             None => self.current_version_id,
             Some(reference) => self
@@ -94,7 +94,7 @@ impl<T: Clone + Default> GeneralViewMetadata<T> {
         };
         self.versions
             .get(&version_id)
-            .ok_or_else(|| Error::InvalidFormat("view metadata".to_string()))
+            .ok_or_else(|| IcebergError::InvalidFormat("view metadata".to_string()))
     }
     /// Add schema to view metadata
     #[inline]
@@ -114,9 +114,9 @@ impl fmt::Display for ViewMetadata {
 }
 
 impl str::FromStr for ViewMetadata {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 
@@ -127,7 +127,7 @@ mod _serde {
     use uuid::Uuid;
 
     use crate::{
-        error::Error,
+        error::IcebergError,
         spec::{schema::SchemaV2, table_metadata::VersionNumber},
     };
 
@@ -166,7 +166,7 @@ mod _serde {
     }
 
     impl<T: Clone + Default> TryFrom<ViewMetadataEnum<T>> for GeneralViewMetadata<T> {
-        type Error = Error;
+        type Error = IcebergError;
         fn try_from(value: ViewMetadataEnum<T>) -> Result<Self, Self::Error> {
             match value {
                 ViewMetadataEnum::V1(metadata) => metadata.try_into(),
@@ -183,7 +183,7 @@ mod _serde {
     }
 
     impl<T: Clone + Default> TryFrom<ViewMetadataV1<T>> for GeneralViewMetadata<T> {
-        type Error = Error;
+        type Error = IcebergError;
         fn try_from(value: ViewMetadataV1<T>) -> Result<Self, Self::Error> {
             Ok(GeneralViewMetadata {
                 view_uuid: value.view_uuid,
@@ -198,7 +198,7 @@ mod _serde {
                         .schemas
                         .into_iter()
                         .map(|x| Ok((x.schema_id, x.try_into()?)))
-                        .collect::<Result<Vec<_>, Error>>()?,
+                        .collect::<Result<Vec<_>, IcebergError>>()?,
                 ),
             })
         }
@@ -297,9 +297,9 @@ impl fmt::Display for Version {
 }
 
 impl str::FromStr for Version {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 
@@ -391,10 +391,10 @@ pub trait Representation: Clone {}
 #[cfg(test)]
 mod tests {
 
-    use crate::{error::Error, spec::view_metadata::ViewMetadata};
+    use crate::{error::IcebergError, spec::view_metadata::ViewMetadata};
 
     #[test]
-    fn test_deserialize_view_data_v1() -> Result<(), Error> {
+    fn test_deserialize_view_data_v1() -> Result<(), IcebergError> {
         let data = r#"
         {
         "view-uuid": "fa6506c3-7681-40c8-86dc-e36561f83385",

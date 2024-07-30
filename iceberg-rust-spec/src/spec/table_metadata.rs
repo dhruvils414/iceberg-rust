@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    error::Error,
+    error::IcebergError,
     spec::{
         partition::PartitionSpec,
         sort::{self, SortOrder},
@@ -130,18 +130,18 @@ pub struct TableMetadata {
 impl TableMetadata {
     /// Get current schema
     #[inline]
-    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, Error> {
+    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, IcebergError> {
         let schema_id = self
             .current_snapshot(branch)?
             .and_then(|x| *x.schema_id())
             .unwrap_or(self.current_schema_id);
         self.schemas
             .get(&schema_id)
-            .ok_or_else(|| Error::InvalidFormat("schema".to_string()))
+            .ok_or_else(|| IcebergError::InvalidFormat("schema".to_string()))
     }
     /// Get schema for snapshot
     #[inline]
-    pub fn schema(&self, snapshot_id: i64) -> Result<&Schema, Error> {
+    pub fn schema(&self, snapshot_id: i64) -> Result<&Schema, IcebergError> {
         let schema_id = self
             .snapshots
             .get(&snapshot_id)
@@ -149,19 +149,19 @@ impl TableMetadata {
             .unwrap_or(self.current_schema_id);
         self.schemas
             .get(&schema_id)
-            .ok_or_else(|| Error::InvalidFormat("schema".to_string()))
+            .ok_or_else(|| IcebergError::InvalidFormat("schema".to_string()))
     }
     /// Get default partition spec
     #[inline]
-    pub fn default_partition_spec(&self) -> Result<&PartitionSpec, Error> {
+    pub fn default_partition_spec(&self) -> Result<&PartitionSpec, IcebergError> {
         self.partition_specs
             .get(&self.default_spec_id)
-            .ok_or_else(|| Error::InvalidFormat("partition spec".to_string()))
+            .ok_or_else(|| IcebergError::InvalidFormat("partition spec".to_string()))
     }
 
     /// Get current snapshot
     #[inline]
-    pub fn current_snapshot(&self, snapshot_ref: Option<&str>) -> Result<Option<&Snapshot>, Error> {
+    pub fn current_snapshot(&self, snapshot_ref: Option<&str>) -> Result<Option<&Snapshot>, IcebergError> {
         let snapshot_id = match snapshot_ref {
             None => self
                 .refs
@@ -178,7 +178,7 @@ impl TableMetadata {
                 {
                     Ok(None)
                 } else {
-                    Err(Error::InvalidFormat("snapshots".to_string()))
+                    Err(IcebergError::InvalidFormat("snapshots".to_string()))
                 }
             }
         }
@@ -189,7 +189,7 @@ impl TableMetadata {
     pub fn current_snapshot_mut(
         &mut self,
         snapshot_ref: Option<String>,
-    ) -> Result<Option<&mut Snapshot>, Error> {
+    ) -> Result<Option<&mut Snapshot>, IcebergError> {
         let snapshot_id = match &snapshot_ref {
             None => self
                 .refs
@@ -205,7 +205,7 @@ impl TableMetadata {
                 {
                     Ok(None)
                 } else {
-                    Err(Error::InvalidFormat("snapshots".to_string()))
+                    Err(IcebergError::InvalidFormat("snapshots".to_string()))
                 }
             }
             Some(snapshot_id) => Ok(self.snapshots.get_mut(&snapshot_id)),
@@ -215,7 +215,7 @@ impl TableMetadata {
                 {
                     Ok(None)
                 } else {
-                    Err(Error::InvalidFormat("snapshots".to_string()))
+                    Err(IcebergError::InvalidFormat("snapshots".to_string()))
                 }
             }
         }
@@ -245,9 +245,9 @@ impl fmt::Display for TableMetadata {
 }
 
 impl str::FromStr for TableMetadata {
-    type Err = Error;
+    type Err = IcebergError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(Error::from)
+        serde_json::from_str(s).map_err(IcebergError::from)
     }
 }
 
@@ -259,7 +259,7 @@ mod _serde {
     use uuid::Uuid;
 
     use crate::{
-        error::Error,
+        error::IcebergError,
         spec::{
             partition::{PartitionField, PartitionSpec},
             schema,
@@ -436,8 +436,8 @@ mod _serde {
     }
 
     impl TryFrom<TableMetadataEnum> for TableMetadata {
-        type Error = Error;
-        fn try_from(value: TableMetadataEnum) -> Result<Self, Error> {
+        type Error = IcebergError;
+        fn try_from(value: TableMetadataEnum) -> Result<Self, IcebergError> {
             match value {
                 TableMetadataEnum::V2(value) => value.try_into(),
                 TableMetadataEnum::V1(value) => value.try_into(),
@@ -455,8 +455,8 @@ mod _serde {
     }
 
     impl TryFrom<TableMetadataV2> for TableMetadata {
-        type Error = Error;
-        fn try_from(value: TableMetadataV2) -> Result<Self, Error> {
+        type Error = IcebergError;
+        fn try_from(value: TableMetadataV2) -> Result<Self, IcebergError> {
             let current_snapshot_id = if let &Some(-1) = &value.current_snapshot_id {
                 None
             } else {
@@ -467,7 +467,7 @@ mod _serde {
                     .schemas
                     .into_iter()
                     .map(|schema| Ok((schema.schema_id, schema.try_into()?)))
-                    .collect::<Result<Vec<_>, Error>>()?,
+                    .collect::<Result<Vec<_>, IcebergError>>()?,
             );
             let mut refs = value.refs;
             if let Some(snapshot_id) = current_snapshot_id {
@@ -487,7 +487,7 @@ mod _serde {
                 current_schema_id: if schemas.keys().contains(&value.current_schema_id) {
                     Ok(value.current_schema_id)
                 } else {
-                    Err(Error::InvalidFormat("schema".to_string()))
+                    Err(IcebergError::InvalidFormat("schema".to_string()))
                 }?,
                 schemas,
                 partition_specs: HashMap::from_iter(
@@ -515,19 +515,19 @@ mod _serde {
     }
 
     impl TryFrom<TableMetadataV1> for TableMetadata {
-        type Error = Error;
-        fn try_from(value: TableMetadataV1) -> Result<Self, Error> {
+        type Error = IcebergError;
+        fn try_from(value: TableMetadataV1) -> Result<Self, IcebergError> {
             let schemas = value
                 .schemas
                 .map(|schemas| {
-                    Ok::<_, Error>(HashMap::from_iter(
+                    Ok::<_, IcebergError>(HashMap::from_iter(
                         schemas
                             .into_iter()
                             .enumerate()
                             .map(|(i, schema)| {
                                 Ok((schema.schema_id.unwrap_or(i as i32), schema.try_into()?))
                             })
-                            .collect::<Result<Vec<_>, Error>>()?
+                            .collect::<Result<Vec<_>, IcebergError>>()?
                             .into_iter(),
                     ))
                 })
@@ -584,11 +584,11 @@ mod _serde {
                 snapshots: value
                     .snapshots
                     .map(|snapshots| {
-                        Ok::<_, Error>(HashMap::from_iter(
+                        Ok::<_, IcebergError>(HashMap::from_iter(
                             snapshots
                                 .into_iter()
                                 .map(|x| Ok((x.snapshot_id, x.into())))
-                                .collect::<Result<Vec<_>, Error>>()?,
+                                .collect::<Result<Vec<_>, IcebergError>>()?,
                         ))
                     })
                     .transpose()?
@@ -734,14 +734,14 @@ pub enum FormatVersion {
 }
 
 impl TryFrom<u8> for FormatVersion {
-    type Error = Error;
+    type Error = IcebergError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match char::from_u32(value as u32)
-            .ok_or_else(|| Error::Conversion("u8".to_string(), "char".to_string()))?
+            .ok_or_else(|| IcebergError::Conversion("u8".to_string(), "char".to_string()))?
         {
             '1' => Ok(FormatVersion::V1),
             '2' => Ok(FormatVersion::V2),
-            _ => Err(Error::Conversion(
+            _ => Err(IcebergError::Conversion(
                 "u8".to_string(),
                 "format version".to_string(),
             )),
@@ -766,7 +766,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        error::Error,
+        error::IcebergError,
         spec::{
             partition::{PartitionField, PartitionSpecBuilder, Transform},
             schema::SchemaBuilder,
@@ -790,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_table_data_v2() -> Result<(), Error> {
+    fn test_deserialize_table_data_v2() -> Result<(), IcebergError> {
         let data = r#"
             {
                 "format-version" : 2,
@@ -855,7 +855,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_table_data_v1() -> Result<(), Error> {
+    fn test_deserialize_table_data_v1() -> Result<(), IcebergError> {
         let data = r#"
         {
             "format-version" : 1,

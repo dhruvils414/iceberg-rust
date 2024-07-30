@@ -12,6 +12,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+tokio = { version = "1", default-features = false }
 object_store = { version = "0.9", features = ["aws", "gcp"] }
 serde = "^1.0"
 serde_derive = "^1.0"
@@ -34,4 +35,10 @@ itertools = "0.10.5"
 derive-getters = "0.3.0"
 tracing = "0.1"
 tracing-futures = "0.2"
-
+anyhow = "1.0.72"
+aws-config = "1.1.8"
+aws-sdk-glue = "1.21.0"
+log = "^0.4"
+typed-builder = "^0.19"
+ctor = "0.2.8"
+port_scanner = "0.1.5"

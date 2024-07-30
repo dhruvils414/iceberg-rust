@@ -9,7 +9,7 @@ use object_store::ObjectStore;
 
 use crate::{
     catalog::{bucket::parse_bucket, identifier::Identifier, Catalog},
-    error::Error,
+    error::IcebergError,
 };
 
 use self::transaction::Transaction as ViewTransaction;
@@ -35,7 +35,7 @@ impl View {
         identifier: Identifier,
         catalog: Arc<dyn Catalog>,
         metadata: ViewMetadata,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, IcebergError> {
         Ok(View {
             identifier,
             metadata,
@@ -56,8 +56,8 @@ impl View {
             .object_store(parse_bucket(&self.metadata.location).unwrap())
     }
     /// Get the schema of the view
-    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, Error> {
-        self.metadata.current_schema(branch).map_err(Error::from)
+    pub fn current_schema(&self, branch: Option<&str>) -> Result<&Schema, IcebergError> {
+        self.metadata.current_schema(branch).map_err(IcebergError::from)
     }
     /// Get the metadata of the view
     pub fn metadata(&self) -> &ViewMetadata {

@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 /// Iceberg error
-pub enum Error {
+pub enum IcebergError {
     /// Invalid format
     #[error("{0} doesn't have the right format")]
     InvalidFormat(String),

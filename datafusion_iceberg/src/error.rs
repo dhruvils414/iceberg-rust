@@ -37,10 +37,10 @@ pub enum Error {
     SQLParser(#[from] datafusion::sql::sqlparser::parser::ParserError),
     /// Iceberg error
     #[error(transparent)]
-    Iceberg(#[from] iceberg_rust::error::Error),
+    Iceberg(#[from] iceberg_rust::error::IcebergError),
     /// Iceberg error
     #[error(transparent)]
-    IcebergSpec(#[from] iceberg_rust_spec::error::Error),
+    IcebergSpec(#[from] iceberg_rust_spec::error::IcebergError),
     /// Serde json
     #[error(transparent)]
     JSONSerde(#[from] serde_json::Error),

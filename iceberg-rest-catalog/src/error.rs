@@ -1,4 +1,4 @@
-use iceberg_rust::error::Error;
+use iceberg_rust::error::IcebergError;
 
 use crate::apis::{self, catalog_api_api::CreateNamespaceError};
 
@@ -6,14 +6,14 @@ use crate::apis::{self, catalog_api_api::CreateNamespaceError};
 Error conversion
 */
 
-impl<T> Into<Error> for apis::Error<T> {
-    fn into(self) -> Error {
+impl<T> Into<IcebergError> for apis::Error<T> {
+    fn into(self) -> IcebergError {
         match self {
-            apis::Error::Reqwest(err) => Error::InvalidFormat(err.to_string()),
-            apis::Error::ReqwestMiddleware(err) => Error::InvalidFormat(err.to_string()),
-            apis::Error::Serde(err) => Error::JSONSerde(err),
-            apis::Error::Io(err) => Error::IO(err),
-            apis::Error::ResponseError(err) => Error::InvalidFormat(format!(
+            apis::Error::Reqwest(err) => IcebergError::InvalidFormat(err.to_string()),
+            apis::Error::ReqwestMiddleware(err) => IcebergError::InvalidFormat(err.to_string()),
+            apis::Error::Serde(err) => IcebergError::JSONSerde(err),
+            apis::Error::Io(err) => IcebergError::IO(err),
+            apis::Error::ResponseError(err) => IcebergError::InvalidFormat(format!(
                 "Response status: {}, Response content: {}",
                 err.status, err.content
             )),

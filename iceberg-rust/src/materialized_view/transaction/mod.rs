@@ -11,7 +11,7 @@ use iceberg_rust_spec::spec::{
 
 use crate::{
     catalog::commit::{CommitTable, CommitView},
-    error::Error,
+    error::IcebergError,
     table::{
         delete_files,
         transaction::{operation::Operation as TableOperation, REWRITE_KEY},
@@ -86,7 +86,7 @@ impl<'view> Transaction<'view> {
     }
 
     /// Commit the transaction to perform the [Operation]s with ACID guarantees.
-    pub async fn commit(self) -> Result<(), Error> {
+    pub async fn commit(self) -> Result<(), IcebergError> {
         let catalog = self.materialized_view.catalog();
 
         let identifier = self.materialized_view.identifier().clone();
