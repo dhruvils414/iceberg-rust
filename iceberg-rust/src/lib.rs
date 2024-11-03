@@ -10,5 +10,4 @@ pub mod materialized_view;
 pub mod spec;
 pub mod sql;
 pub mod table;
-pub(crate) mod util;
 pub mod view;
