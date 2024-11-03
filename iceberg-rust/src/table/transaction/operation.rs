@@ -9,26 +9,64 @@ use std::{
 
 use apache_avro::from_value;
 use futures::{lock::Mutex, stream, StreamExt, TryStreamExt};
-use iceberg_rust_spec::spec::{
-    manifest::{partition_value_schema, Content, DataFile, ManifestEntry, ManifestWriter, Status},
-    manifest_list::{FieldSummary, ManifestListEntry, ManifestListEntryEnum},
-    partition::PartitionField,
-    schema::Schema,
-    snapshot::{
-        generate_snapshot_id, SnapshotBuilder, SnapshotReference, SnapshotRetention, Summary,
-    },
-    types::StructField,
-    values::{Struct, Value},
+use iceberg_rust_spec::manifest_list::{
+    manifest_list_schema_v1, manifest_list_schema_v2, ManifestListReader,
 };
+use iceberg_rust_spec::spec::table_metadata::TableMetadata;
 use iceberg_rust_spec::util::strip_prefix;
 use iceberg_rust_spec::{error::Error as SpecError, spec::table_metadata::TableMetadata};
+use iceberg_rust_spec::{
+    spec::{
+        manifest::{
+            partition_value_schema, Content, DataFile, ManifestEntry, ManifestWriter, Status,
+        },
+        manifest_list::{FieldSummary, ManifestListEntry, ManifestListEntryEnum},
+        partition::PartitionField,
+        schema::Schema,
+        snapshot::{
+            generate_snapshot_id, SnapshotBuilder, SnapshotReference, SnapshotRetention, Summary,
+        },
+        types::StructField,
+        values::{Struct, Value},
+    },
+    table_metadata::FormatVersion,
+};
 use object_store::ObjectStore;
+use smallvec::SmallVec;
 
 use crate::{
     catalog::commit::{TableRequirement, TableUpdate},
     error::Error,
+    util::partition_struct_to_vec,
 };
 
+use super::append::{
+    select_manifest_partitioned, select_manifest_unpartitioned, split_datafiles, SelectedManifest,
+};
+/// The target number of datafiles per manifest is dynamic, but we don't want to go below this number.
+static MIN_DATAFILES_PER_MANIFEST: usize = 4;
+/// To achieve fast lookups of the datafiles, the manifest tree should be somewhat balanced, meaning that manifest files should contain a similar number of datafiles.
+/// This means that manifest files might need to be split up when they get too large. Since the number of datafiles being added by a append operation might be really large,
+/// it might even be required to split the manifest file multiple times. *n_splits* stores how many times a manifest file needs to be split to give at most *limit* datafiles per manifest.
+fn compute_n_splits(
+    existing_file_count: usize,
+    new_file_count: usize,
+    selected_manifest_file_count: usize,
+) -> u32 {
+    // We want:
+    //   nb manifests per manifest list ~= nb data files per manifest
+    // Since:
+    //   total number of data files = nb manifests per manifest list * nb data files per manifest
+    // We shall have:
+    //   limit = sqrt(total number of data files)
+    let limit = MIN_DATAFILES_PER_MANIFEST
+        + ((existing_file_count + new_file_count) as f64).sqrt() as usize;
+    let new_manifest_file_count = selected_manifest_file_count + new_file_count;
+    match new_manifest_file_count / limit {
+        0 => 0,
+        x => x.ilog2() + 1,
+    }
+}
 #[derive(Debug)]
 ///Table operations
 pub enum Operation {
@@ -45,7 +83,7 @@ pub enum Operation {
     // /// Update the table location
     // UpdateLocation,
     /// Append new files to the table
-    NewAppend {
+    Append {
         branch: Option<String>,
         files: Vec<DataFile>,
         additional_summary: Option<HashMap<String, String>>,
@@ -84,7 +122,7 @@ impl Operation {
         object_store: Arc<dyn ObjectStore>,
     ) -> Result<(Option<TableRequirement>, Vec<TableUpdate>), Error> {
         match self {
-            Operation::NewAppend {
+            Operation::Append {
                 branch,
                 files,
                 additional_summary,
@@ -92,6 +130,34 @@ impl Operation {
                 let partition_spec = table_metadata.default_partition_spec()?;
                 let schema = table_metadata.current_schema(branch.as_deref())?;
                 let old_snapshot = table_metadata.current_snapshot(branch.as_deref())?;
+
+                let partition_column_names = table_metadata
+                    .default_partition_spec()?
+                    .fields()
+                    .iter()
+                    .map(|x| x.name().as_str())
+                    .collect::<SmallVec<[_; 4]>>();
+                let bounding_partition_values = new_files
+                    .iter()
+                    .try_fold(None, |acc, x| {
+                        let node = partition_struct_to_vec(x.partition(), &partition_column_names)?;
+                        let Some(mut acc) = acc else {
+                            return Ok::<_, Error>(Some(Rectangle::new(node.clone(), node)));
+                        };
+                        acc.expand_with_node(node);
+                        Ok(Some(acc))
+                    })?
+                    .ok_or(Error::NotFound(
+                        "Bounding".to_owned(),
+                        "rectangle".to_owned(),
+                    ))?;
+                let manifest_list_schema = match table_metadata.format_version {
+                    FormatVersion::V1 => manifest_list_schema_v1(),
+                    FormatVersion::V2 => manifest_list_schema_v2(),
+                };
+
+                let mut manifest_list_writer =
+                    apache_avro::Writer::new(manifest_list_schema, Vec::new());
 
                 let datafiles = Arc::new(files.into_iter().map(Ok::<_, Error>).try_fold(
                     HashMap::<Struct, Vec<DataFile>>::new(),

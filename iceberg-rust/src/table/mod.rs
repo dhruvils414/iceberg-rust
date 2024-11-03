@@ -21,6 +21,7 @@ use crate::{
     table::transaction::TableTransaction,
 };
 
+pub mod manifest;
 pub mod transaction;
 
 #[derive(Debug)]
