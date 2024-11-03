@@ -4,11 +4,12 @@ Defining the [Table] struct that represents an iceberg table.
 
 use std::{io::Cursor, iter::repeat, sync::Arc};
 
+use manifest::ManifestReader;
 use object_store::{path::Path, ObjectStore};
 
 use futures::{stream, StreamExt, TryFutureExt, TryStreamExt};
 use iceberg_rust_spec::spec::{
-    manifest::{Content, ManifestEntry, ManifestReader},
+    manifest::{Content, ManifestEntry},
     manifest_list::ManifestListEntry,
     schema::Schema,
     table_metadata::TableMetadata,
@@ -21,6 +22,7 @@ use crate::{
     table::transaction::TableTransaction,
 };
 
+pub mod manifest;
 pub mod transaction;
 
 #[derive(Debug)]

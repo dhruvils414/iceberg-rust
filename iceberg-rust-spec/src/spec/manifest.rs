@@ -196,7 +196,7 @@ impl ManifestEntry {
 }
 
 impl ManifestEntry {
-    pub(crate) fn try_from_v2(
+    pub fn try_from_v2(
         value: ManifestEntryV2,
         schema: &Schema,
         partition_spec: &PartitionSpec,
@@ -210,7 +210,7 @@ impl ManifestEntry {
         })
     }
 
-    pub(crate) fn try_from_v1(
+    pub fn try_from_v1(
         value: ManifestEntryV1,
         schema: &Schema,
         partition_spec: &PartitionSpec,
