@@ -2,7 +2,10 @@
  * Partitioning
 */
 
-use std::{fmt, str};
+use std::{
+    fmt::{self, Display},
+    str,
+};
 
 use derive_getters::Getters;
 use serde::{
@@ -113,6 +116,21 @@ where
     serializer.serialize_str(&format!("truncate[{value}]"))
 }
 
+impl Display for Transform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Transform::Identity => write!(f, "identity"),
+            Transform::Year => write!(f, "year"),
+            Transform::Month => write!(f, "month"),
+            Transform::Day => write!(f, "day"),
+            Transform::Hour => write!(f, "hour"),
+            Transform::Bucket(i) => write!(f, "bucket[{}]", i),
+            Transform::Truncate(i) => write!(f, "truncate[{}]", i),
+            Transform::Void => write!(f, "void"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Getters)]
 #[serde(rename_all = "kebab-case")]
 /// Partition fields capture the transform from table data to partition values.
@@ -165,10 +183,13 @@ impl PartitionSpec {
             .map(|field| {
                 schema
                     .get(field.source_id as usize)
-                    .map(|x| x.field_type.clone())
+                    .ok_or(Error::NotFound(
+                        "Partition field".to_owned(),
+                        field.name.clone(),
+                    ))
+                    .and_then(|x| x.field_type.clone().tranform(&field.transform))
             })
-            .collect::<Option<Vec<_>>>()
-            .ok_or(Error::InvalidFormat("partition spec".to_string()))
+            .collect::<Result<Vec<_>, Error>>()
     }
 }
 
@@ -177,7 +198,7 @@ impl fmt::Display for PartitionSpec {
         write!(
             f,
             "{}",
-            &serde_json::to_string(self).map_err(|_| fmt::Error::default())?,
+            &serde_json::to_string(self).map_err(|_| fmt::Error)?,
         )
     }
 }
