@@ -33,4 +33,5 @@ itertools = "0.10.5"
 derive-getters = "0.3.0"
 tracing = "0.1"
 tracing-futures = "0.2"
+apache-avro = "0.16.0"
 
