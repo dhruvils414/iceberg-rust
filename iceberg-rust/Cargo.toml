@@ -31,4 +31,7 @@ thiserror = { workspace = true }
 derive-getters = { workspace = true }
 iceberg-rust-spec = { path = "../iceberg-rust-spec", version = "0.5.8" }
 smallvec = { version = "1.13.2", features = ["const_generics"] }
+datafusion = { workspace = true }
+datafusion-expr = { workspace = true }
+datafusion_iceberg = { path = "../datafusion_iceberg"}
 

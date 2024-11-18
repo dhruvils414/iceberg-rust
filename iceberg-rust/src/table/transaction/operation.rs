@@ -8,15 +8,24 @@ use iceberg_rust_spec::manifest_list::{manifest_list_schema_v1, manifest_list_sc
 use iceberg_rust_spec::spec::table_metadata::TableMetadata;
 use iceberg_rust_spec::spec::{
     manifest::{partition_value_schema, DataFile, ManifestEntry, Status},
+    manifest_list::{ManifestListEntry},
     schema::Schema,
     snapshot::{
         generate_snapshot_id, SnapshotBuilder, SnapshotReference, SnapshotRetention, Summary,
     },
+
 };
+
+use crate::table::datafiles;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::physical_optimizer::pruning::PruningPredicate;
+use datafusion_iceberg::pruning_statistics::PruneDataFiles;
+use crate::table::manifest_list::read_snapshot;
 use iceberg_rust_spec::table_metadata::FormatVersion;
 use iceberg_rust_spec::util::strip_prefix;
 use object_store::ObjectStore;
 use smallvec::SmallVec;
+use datafusion::physical_plan::PhysicalExpr;
 
 use crate::table::manifest::{ManifestReader, ManifestWriter};
 use crate::table::manifest_list::ManifestListReader;
@@ -64,6 +73,14 @@ pub enum Operation {
         branch: Option<String>,
         files: Vec<DataFile>,
         additional_summary: Option<HashMap<String, String>>,
+    },
+    /// /// Delete files in the table, based on a filter
+    /// and Commit. This is a precursor to the DELETE, UPDATE operations
+    Filter {
+        branch: Option<String>,
+        filter: Option<Arc<dyn PhysicalExpr>>,
+        additional_summary: Option<HashMap<String, String>>,
+        new_files: Vec<DataFile>,
     },
     // /// Replace manifests files and commit
     // RewriteManifests,
@@ -550,7 +567,114 @@ impl Operation {
                     ],
                 ))
             }
-            Operation::UpdateProperties(entries) => Ok((
+
+            Operation::Filter {
+                branch,
+                filter,
+                additional_summary,
+                new_files,
+            } => {
+                // Delete Manifests, files based on the filter provided.
+                // use code similar to table_scan(), and NewAppend() to generate code which does the following
+                // 1. get the manifest list
+                // 2. for each manifest, get the files
+                // 3. for each file, check if it passes the filter
+                // 4. if it passes the filter, don't add it to the new manifest list
+                // 5. if it doesn't pass the filter, add it to the manifest list of the table
+                // 6. Create a snapshot for the same
+
+                let schema = table_metadata.current_schema(branch.as_deref())?;
+                let old_snapshot = table_metadata.current_snapshot(branch.as_deref())?;
+
+                let manifest_list_schema = match table_metadata.format_version {
+                    FormatVersion::V1 => manifest_list_schema_v1(),
+                    FormatVersion::V2 => manifest_list_schema_v2(),
+                };
+
+                let manifests: Vec<ManifestListEntry> = if let Some(snapshot) = old_snapshot {
+                    match read_snapshot(snapshot,table_metadata, object_store.clone()).await
+                    {
+                        Ok(stream) => match stream.collect::<Result<Vec<_>, _>>() {
+                            Ok(manifests) => manifests,
+                            Err(e) => {
+                                eprintln!(
+                                    "Error Reading Manifest List during Operation::Filter {e}"
+                                );
+                                vec![]
+                            }
+                        },
+                        Err(e) => {
+                            if !e.to_string().contains("No data in memory found") {
+                                panic!("Error Reading Manifest List {e}");
+                            }
+                            // TODO :: Find a graceful solution to the empty manifest list problem
+                            eprintln!("Proceeding with Empty Manifest List");
+                            vec![]
+                        }
+                    }
+                } else {
+                    vec![]
+                };
+
+
+                let all_datafiles = datafiles(object_store.clone(), &manifests, None)
+                    .await
+                    .map_err(Into::<Error>::into)?;
+
+
+                let pruned_data_files = if let Some(physical_predicate) = filter.clone() {
+                    let arrow_schema: SchemaRef = Arc::new((schema.fields()).try_into().unwrap());
+                    let pruning_predicate =
+                        match PruningPredicate::try_new(physical_predicate, arrow_schema.clone()) {
+                            Ok(predicate) => predicate,
+                            Err(e) => {
+                                return Err(Error::IO(e.into()));
+                            }
+                        };
+
+                    let files_to_prune = match pruning_predicate.prune(&PruneDataFiles::new(
+                        &schema,
+                        &arrow_schema,
+                        &all_datafiles,
+                    )) {
+                        Ok(files) => files,
+                        Err(e) => {
+                            return Err(Error::IO(e.into()));
+                        }
+                    };
+
+                    let pruned_data_files = all_datafiles
+                        .clone()
+                        .into_iter()
+                        .zip(files_to_prune.into_iter())
+                        .filter_map(|(data_file, should_prune)| {
+                            if should_prune || *data_file.status() == Status::Deleted {
+                                None
+                            } else {
+                                Some(data_file)
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    pruned_data_files
+                } else {
+                    all_datafiles
+                        .clone()
+                        .into_iter()
+                        .filter_map(|data_file| {
+                            if *data_file.status() == Status::Deleted {
+                                None
+                            } else {
+                                Some(data_file)
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                };
+
+
+            }
+
+                Operation::UpdateProperties(entries) => Ok((
                 None,
                 vec![TableUpdate::SetProperties {
                     updates: HashMap::from_iter(entries),

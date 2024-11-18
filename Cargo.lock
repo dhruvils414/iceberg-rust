@@ -2924,6 +2924,8 @@ dependencies = [
  "apache-avro",
  "arrow",
  "async-trait",
+ "datafusion",
+ "datafusion-expr",
  "derive-getters",
  "derive_builder",
  "futures",
