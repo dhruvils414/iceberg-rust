@@ -243,6 +243,9 @@ impl Catalog for GlueCatalog {
         let database = identifier.namespace().to_string();
         let tablename = identifier.name().to_string();
 
+        println!("database {:?}", database);
+        println!("tablename {:?}", tablename);
+
         let builder = self
             .client
             .0
