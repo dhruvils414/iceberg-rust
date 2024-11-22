@@ -256,7 +256,9 @@ impl Catalog for GlueCatalog {
         let glue_table_output = builder
             .send()
             .await
-            .map_err(|_| IcebergError::InvalidFormat("Failed to build table input".to_string()))?;
+            .map_err(|err| {
+                IcebergError::InvalidFormat(format!("Failed to build table input: {:?}", err))
+            })?;
 
         match glue_table_output.table() {
             None => Err(IcebergError::InvalidFormat(format!(
