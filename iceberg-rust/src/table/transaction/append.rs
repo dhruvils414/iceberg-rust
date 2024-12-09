@@ -107,6 +107,7 @@ pub(crate) fn select_manifest_partitioned(
 
         let mut bounds = summary_to_rectangle(
             manifest
+                .v1
                 .partitions
                 .as_ref()
                 .ok_or(Error::NotFound("Partition".to_owned(), "struct".to_owned()))?,
@@ -114,7 +115,7 @@ pub(crate) fn select_manifest_partitioned(
 
         bounds.expand(bounding_partition_values);
 
-        file_count_all_entries += manifest.added_files_count.unwrap_or(0) as usize;
+        file_count_all_entries += manifest.v1.added_files_count.unwrap_or(0) as usize;
 
         let Some((selected_bounds, selected_manifest)) = &selected_state else {
             selected_state = Some((bounds, manifest));
@@ -151,8 +152,8 @@ pub(crate) fn select_manifest_unpartitioned(
     for manifest_res in manifest_list_reader {
         let manifest = manifest_res?;
         // TODO: should this also account for existing_rows_count / existing_files_count?
-        let row_count = manifest.added_rows_count;
-        file_count_all_entries += manifest.added_files_count.unwrap_or(0) as usize;
+        let row_count = manifest.v1.added_rows_count;
+        file_count_all_entries += manifest.v1.added_files_count.unwrap_or(0) as usize;
 
         let Some((selected_row_count, selected_manifest)) = &selected_state else {
             selected_state = Some((row_count, manifest));

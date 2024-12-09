@@ -108,6 +108,7 @@ pub struct ManifestWriter<'schema, 'metadata> {
     manifest: ManifestListEntry,
     writer: AvroWriter<'schema, Vec<u8>>,
 }
+use crate::spec::manifest_list::_serde::ManifestListEntryV1;
 
 impl<'schema, 'metadata> ManifestWriter<'schema, 'metadata> {
     /// Create empty manifest writer
@@ -159,21 +160,23 @@ impl<'schema, 'metadata> ManifestWriter<'schema, 'metadata> {
 
         let manifest = ManifestListEntry {
             format_version: table_metadata.format_version.clone(),
-            manifest_path: manifest_location.to_owned(),
-            manifest_length: 0,
-            partition_spec_id: table_metadata.default_spec_id,
             content: manifest_list::Content::Data,
             sequence_number: table_metadata.last_sequence_number,
             min_sequence_number: 0,
-            added_snapshot_id: snapshot_id,
-            added_files_count: Some(0),
-            existing_files_count: Some(0),
-            deleted_files_count: Some(0),
-            added_rows_count: Some(0),
-            existing_rows_count: Some(0),
-            deleted_rows_count: Some(0),
-            partitions: None,
-            key_metadata: None,
+            v1: ManifestListEntryV1 {
+                added_snapshot_id: snapshot_id,
+                manifest_path: manifest_location.to_owned(),
+                manifest_length: 0,
+                partition_spec_id: table_metadata.default_spec_id,
+                added_files_count: Some(0),
+                existing_files_count: Some(0),
+                deleted_files_count: Some(0),
+                added_rows_count: Some(0),
+                existing_rows_count: Some(0),
+                deleted_rows_count: Some(0),
+                partitions: None,
+                key_metadata: None,
+            },
         };
 
         Ok(ManifestWriter {
@@ -245,8 +248,8 @@ impl<'schema, 'metadata> ManifestWriter<'schema, 'metadata> {
     pub fn append(&mut self, manifest_entry: ManifestEntry) -> Result<(), Error> {
         let mut added_rows_count = 0;
 
-        if self.manifest.partitions.is_none() {
-            self.manifest.partitions = Some(
+        if self.manifest.v1.partitions.is_none() {
+            self.manifest.v1.partitions = Some(
                 self.table_metadata
                     .default_partition_spec()?
                     .fields()
@@ -263,18 +266,18 @@ impl<'schema, 'metadata> ManifestWriter<'schema, 'metadata> {
 
         added_rows_count += manifest_entry.data_file().record_count();
         update_partitions(
-            self.manifest.partitions.as_mut().unwrap(),
+            self.manifest.v1.partitions.as_mut().unwrap(),
             manifest_entry.data_file().partition(),
             self.table_metadata.default_partition_spec()?.fields(),
         )?;
 
         self.writer.append_ser(manifest_entry)?;
 
-        self.manifest.added_files_count = match self.manifest.added_files_count {
+        self.manifest.v1.added_files_count = match self.manifest.v1.added_files_count {
             Some(count) => Some(count + 1),
             None => Some(1),
         };
-        self.manifest.added_rows_count = match self.manifest.added_rows_count {
+        self.manifest.v1.added_rows_count = match self.manifest.v1.added_rows_count {
             Some(count) => Some(count + added_rows_count),
             None => Some(added_rows_count),
         };
@@ -291,11 +294,13 @@ impl<'schema, 'metadata> ManifestWriter<'schema, 'metadata> {
 
         let manifest_length: i64 = manifest_bytes.len() as i64;
 
-        self.manifest.manifest_length += manifest_length;
+        self.manifest.v1.manifest_length += manifest_length;
 
         object_store
             .put(
-                &strip_prefix(&self.manifest.manifest_path).as_str().into(),
+                &strip_prefix(&self.manifest.v1.manifest_path)
+                    .as_str()
+                    .into(),
                 manifest_bytes.into(),
             )
             .await?;

@@ -63,7 +63,7 @@ impl<'table, 'manifests> PruningStatistics for PruneManifests<'table, 'manifests
             .tranform(partition_field.transform())
             .ok()?;
         let min_values = self.files.iter().filter_map(|manifest| {
-            manifest.partitions.as_ref().and_then(|partitions| {
+            manifest.v1.partitions.as_ref().and_then(|partitions| {
                 partitions[index]
                     .lower_bound
                     .as_ref()
@@ -85,7 +85,7 @@ impl<'table, 'manifests> PruningStatistics for PruneManifests<'table, 'manifests
             .tranform(partition_field.transform())
             .ok()?;
         let max_values = self.files.iter().filter_map(|manifest| {
-            manifest.partitions.as_ref().and_then(|partitions| {
+            manifest.v1.partitions.as_ref().and_then(|partitions| {
                 partitions[index]
                     .upper_bound
                     .as_ref()
@@ -106,7 +106,7 @@ impl<'table, 'manifests> PruningStatistics for PruneManifests<'table, 'manifests
             .enumerate()
             .find(|(_, partition_field)| partition_field.source_id() == &column.id)?;
         let contains_null = self.files.iter().filter_map(|manifest| {
-            manifest.partitions.as_ref().map(|partitions| {
+            manifest.v1.partitions.as_ref().map(|partitions| {
                 if !partitions[index].contains_null {
                     Some(0)
                 } else {
@@ -128,7 +128,7 @@ impl<'table, 'manifests> PruningStatistics for PruneManifests<'table, 'manifests
         ScalarValue::iter_to_array(
             self.files
                 .iter()
-                .map(|x| x.added_rows_count)
+                .map(|x| x.v1.added_rows_count)
                 .map(ScalarValue::Int64),
         )
         .ok()

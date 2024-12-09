@@ -192,7 +192,7 @@ impl Operation {
                 let selected_manifest_file_count = selected_manifest_opt
                     .as_ref()
                     // TODO: should this also account for existing_files_count?
-                    .and_then(|selected_manifest| selected_manifest.added_files_count)
+                    .and_then(|selected_manifest| selected_manifest.v1.added_files_count)
                     .unwrap_or(0) as usize;
                 let n_splits = compute_n_splits(
                     existing_file_count,
@@ -202,7 +202,7 @@ impl Operation {
 
                 let bounds = selected_manifest_opt
                     .as_ref()
-                    .and_then(|x| x.partitions.as_deref())
+                    .and_then(|x| x.v1.partitions.as_deref())
                     .map(summary_to_rectangle)
                     .transpose()?
                     .map(|mut x| {
@@ -243,7 +243,7 @@ impl Operation {
                 if n_splits == 0 {
                     let mut manifest_writer = if let Some(manifest) = selected_manifest_opt {
                         let manifest_bytes: Vec<u8> = object_store
-                            .get(&strip_prefix(&manifest.manifest_path).as_str().into())
+                            .get(&strip_prefix(&manifest.v1.manifest_path).as_str().into())
                             .await?
                             .bytes()
                             .await?
@@ -284,7 +284,7 @@ impl Operation {
                     // Split datafiles
                     let splits = if let Some(manifest) = selected_manifest_opt {
                         let manifest_bytes: Vec<u8> = object_store
-                            .get(&strip_prefix(&manifest.manifest_path).as_str().into())
+                            .get(&strip_prefix(&manifest.v1.manifest_path).as_str().into())
                             .await?
                             .bytes()
                             .await?
