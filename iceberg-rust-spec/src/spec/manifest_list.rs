@@ -14,7 +14,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::error::Error;
 
-use self::_serde::{FieldSummarySerde, ManifestListEntryV1, ManifestListEntryV2};
+use self::_serde::{FieldSummarySerde, ManifestListEntryV1, ManifestListEntryV2,ManifestListEntrySparkV2, ManifestListEntrySparkV1};
 
 use super::{
     table_metadata::{FormatVersion, TableMetadata},
@@ -99,8 +99,12 @@ pub struct ManifestListEntry {
 pub enum ManifestListEntryEnum {
     /// Version 2 of the manifest file
     V2(ManifestListEntryV2),
+    /// Version 2 spark of the manifest file
+    SparkV2(ManifestListEntrySparkV2),
     /// Version 1 of the manifest file
     V1(ManifestListEntryV1),
+    /// Version 1 spark of the manifest file
+    SparkV1(ManifestListEntrySparkV1),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -173,6 +177,40 @@ mod _serde {
     }
 
     #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+    pub struct ManifestListEntrySparkV2 {
+        /// Location of the manifest file
+        pub manifest_path: String,
+        /// Length of the manifest file in bytes
+        pub manifest_length: i64,
+        /// ID of a partition spec used to write the manifest; must be listed in table metadata partition-specs
+        pub partition_spec_id: i32,
+        /// The type of files tracked by the manifest, either data or delete files; 0 for all v1 manifests
+        pub content: Content,
+        /// The sequence number when the manifest was added to the table; use 0 when reading v1 manifest lists
+        pub sequence_number: i64,
+        /// The minimum sequence number of all data or delete files in the manifest; use 0 when reading v1 manifest lists
+        pub min_sequence_number: i64,
+        /// ID of the snapshot where the manifest file was added
+        pub added_snapshot_id: i64,
+        /// Number of entries in the manifest that have status ADDED (1), when null this is assumed to be non-zero
+        pub added_data_files_count: i32,
+        /// Number of entries in the manifest that have status EXISTING (0), when null this is assumed to be non-zero
+        pub existing_data_files_count: i32,
+        /// Number of entries in the manifest that have status DELETED (2), when null this is assumed to be non-zero
+        pub deleted_data_files_count: i32,
+        /// Number of rows in all of files in the manifest that have status ADDED, when null this is assumed to be non-zero
+        pub added_rows_count: i64,
+        /// Number of rows in all of files in the manifest that have status EXISTING, when null this is assumed to be non-zero
+        pub existing_rows_count: i64,
+        /// Number of rows in all of files in the manifest that have status DELETED, when null this is assumed to be non-zero
+        pub deleted_rows_count: i64,
+        /// A list of field summaries for each partition field in the spec. Each field in the list corresponds to a field in the manifest file’s partition spec.
+        pub partitions: Option<Vec<FieldSummarySerde>>,
+        /// Implementation-specific key metadata for encryption
+        pub key_metadata: Option<ByteBuf>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
     /// A manifest list includes summary metadata that can be used to avoid scanning all of the manifests in a snapshot when planning a table scan.
     /// This includes the number of added, existing, and deleted files, and a summary of values for each field of the partition spec used to write the manifest.
     pub struct ManifestListEntryV1 {
@@ -190,6 +228,37 @@ mod _serde {
         pub existing_files_count: Option<i32>,
         /// Number of entries in the manifest that have status DELETED (2), when null this is assumed to be non-zero
         pub deleted_files_count: Option<i32>,
+        /// Number of rows in all of files in the manifest that have status ADDED, when null this is assumed to be non-zero
+        pub added_rows_count: Option<i64>,
+        /// Number of rows in all of files in the manifest that have status EXISTING, when null this is assumed to be non-zero
+        pub existing_rows_count: Option<i64>,
+        /// Number of rows in all of files in the manifest that have status DELETED, when null this is assumed to be non-zero
+        pub deleted_rows_count: Option<i64>,
+        /// A list of field summaries for each partition field in the spec. Each field in the list corresponds to a field in the manifest file’s partition spec.
+        pub partitions: Option<Vec<FieldSummarySerde>>,
+        /// Implementation-specific key metadata for encryption
+        pub key_metadata: Option<ByteBuf>,
+    }
+
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+    /// A manifest list includes summary metadata that can be used to avoid scanning all of the manifests in a snapshot when planning a table scan.
+    /// This includes the number of added, existing, and deleted files, and a summary of values for each field of the partition spec used to write the manifest.
+    pub struct ManifestListEntrySparkV1 {
+        /// Location of the manifest file
+        pub manifest_path: String,
+        /// Length of the manifest file in bytes
+        pub manifest_length: i64,
+        /// ID of a partition spec used to write the manifest; must be listed in table metadata partition-specs
+        pub partition_spec_id: i32,
+        /// ID of the snapshot where the manifest file was added
+        pub added_snapshot_id: i64,
+        /// Number of entries in the manifest that have status ADDED (1), when null this is assumed to be non-zero
+        pub added_data_files_count: Option<i32>,
+        /// Number of entries in the manifest that have status EXISTING (0), when null this is assumed to be non-zero
+        pub existing_data_files_count: Option<i32>,
+        /// Number of entries in the manifest that have status DELETED (2), when null this is assumed to be non-zero
+        pub deleted_data_files_count: Option<i32>,
         /// Number of rows in all of files in the manifest that have status ADDED, when null this is assumed to be non-zero
         pub added_rows_count: Option<i64>,
         /// Number of rows in all of files in the manifest that have status EXISTING, when null this is assumed to be non-zero
