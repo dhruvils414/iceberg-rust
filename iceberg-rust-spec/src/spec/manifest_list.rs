@@ -9,16 +9,17 @@ use std::{
 
 use apache_avro::{types::Value as AvroValue, Reader as AvroReader, Schema as AvroSchema};
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::error::Error;
 
-use self::_serde::{FieldSummarySerde, ManifestListEntryV1, ManifestListEntryV2,ManifestListEntrySparkV2, ManifestListEntrySparkV1};
+use self::_serde::{
+    FieldSummarySerde, ManifestListEntrySparkV1, ManifestListEntrySparkV2, ManifestListEntryV1,
+    ManifestListEntryV2,
+};
 
 use super::{
     table_metadata::{FormatVersion, TableMetadata},
-    types::Type,
     values::Value,
 };
 
@@ -59,38 +60,15 @@ impl<'a, 'metadata, R: Read> ManifestListReader<'a, 'metadata, R> {
 /// A manifest list includes summary metadata that can be used to avoid scanning all of the manifests in a snapshot when planning a table scan.
 /// This includes the number of added, existing, and deleted files, and a summary of values for each field of the partition spec used to write the manifest.
 pub struct ManifestListEntry {
+    pub v1: ManifestListEntryV1,
     /// Table format version
     pub format_version: FormatVersion,
-    /// Location of the manifest file
-    pub manifest_path: String,
-    /// Length of the manifest file in bytes
-    pub manifest_length: i64,
-    /// ID of a partition spec used to write the manifest; must be listed in table metadata partition-specs
-    pub partition_spec_id: i32,
     /// The type of files tracked by the manifest, either data or delete files; 0 for all v1 manifests
     pub content: Content,
     /// The sequence number when the manifest was added to the table; use 0 when reading v1 manifest lists
     pub sequence_number: i64,
     /// The minimum sequence number of all data or delete files in the manifest; use 0 when reading v1 manifest lists
     pub min_sequence_number: i64,
-    /// ID of the snapshot where the manifest file was added
-    pub added_snapshot_id: i64,
-    /// Number of entries in the manifest that have status ADDED (1), when null this is assumed to be non-zero
-    pub added_files_count: Option<i32>,
-    /// Number of entries in the manifest that have status EXISTING (0), when null this is assumed to be non-zero
-    pub existing_files_count: Option<i32>,
-    /// Number of entries in the manifest that have status DELETED (2), when null this is assumed to be non-zero
-    pub deleted_files_count: Option<i32>,
-    /// Number of rows in all of files in the manifest that have status ADDED, when null this is assumed to be non-zero
-    pub added_rows_count: Option<i64>,
-    /// Number of rows in all of files in the manifest that have status EXISTING, when null this is assumed to be non-zero
-    pub existing_rows_count: Option<i64>,
-    /// Number of rows in all of files in the manifest that have status DELETED, when null this is assumed to be non-zero
-    pub deleted_rows_count: Option<i64>,
-    /// A list of field summaries for each partition field in the spec. Each field in the list corresponds to a field in the manifest file’s partition spec.
-    pub partitions: Option<Vec<FieldSummary>>,
-    /// Implementation-specific key metadata for encryption
-    pub key_metadata: Option<ByteBuf>,
 }
 
 /// Entry in manifest file.
@@ -133,7 +111,7 @@ pub enum Content {
     Deletes = 1,
 }
 
-mod _serde {
+pub mod _serde {
     use crate::spec::table_metadata::FormatVersion;
 
     use super::{Content, FieldSummary, ManifestListEntry, ManifestListEntryEnum};
@@ -144,36 +122,13 @@ mod _serde {
     /// A manifest list includes summary metadata that can be used to avoid scanning all of the manifests in a snapshot when planning a table scan.
     /// This includes the number of added, existing, and deleted files, and a summary of values for each field of the partition spec used to write the manifest.
     pub struct ManifestListEntryV2 {
-        /// Location of the manifest file
-        pub manifest_path: String,
-        /// Length of the manifest file in bytes
-        pub manifest_length: i64,
-        /// ID of a partition spec used to write the manifest; must be listed in table metadata partition-specs
-        pub partition_spec_id: i32,
+        pub v1: ManifestListEntryV1,
         /// The type of files tracked by the manifest, either data or delete files; 0 for all v1 manifests
         pub content: Content,
         /// The sequence number when the manifest was added to the table; use 0 when reading v1 manifest lists
         pub sequence_number: i64,
         /// The minimum sequence number of all data or delete files in the manifest; use 0 when reading v1 manifest lists
         pub min_sequence_number: i64,
-        /// ID of the snapshot where the manifest file was added
-        pub added_snapshot_id: i64,
-        /// Number of entries in the manifest that have status ADDED (1), when null this is assumed to be non-zero
-        pub added_files_count: i32,
-        /// Number of entries in the manifest that have status EXISTING (0), when null this is assumed to be non-zero
-        pub existing_files_count: i32,
-        /// Number of entries in the manifest that have status DELETED (2), when null this is assumed to be non-zero
-        pub deleted_files_count: i32,
-        /// Number of rows in all of files in the manifest that have status ADDED, when null this is assumed to be non-zero
-        pub added_rows_count: i64,
-        /// Number of rows in all of files in the manifest that have status EXISTING, when null this is assumed to be non-zero
-        pub existing_rows_count: i64,
-        /// Number of rows in all of files in the manifest that have status DELETED, when null this is assumed to be non-zero
-        pub deleted_rows_count: i64,
-        /// A list of field summaries for each partition field in the spec. Each field in the list corresponds to a field in the manifest file’s partition spec.
-        pub partitions: Option<Vec<FieldSummarySerde>>,
-        /// Implementation-specific key metadata for encryption
-        pub key_metadata: Option<ByteBuf>,
     }
 
     #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -235,11 +190,10 @@ mod _serde {
         /// Number of rows in all of files in the manifest that have status DELETED, when null this is assumed to be non-zero
         pub deleted_rows_count: Option<i64>,
         /// A list of field summaries for each partition field in the spec. Each field in the list corresponds to a field in the manifest file’s partition spec.
-        pub partitions: Option<Vec<FieldSummarySerde>>,
+        pub partitions: Option<Vec<FieldSummary>>,
         /// Implementation-specific key metadata for encryption
         pub key_metadata: Option<ByteBuf>,
     }
-
 
     #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
     /// A manifest list includes summary metadata that can be used to avoid scanning all of the manifests in a snapshot when planning a table scan.
@@ -282,45 +236,18 @@ mod _serde {
 
     impl From<ManifestListEntry> for ManifestListEntryV1 {
         fn from(value: ManifestListEntry) -> Self {
-            ManifestListEntryV1 {
-                manifest_path: value.manifest_path,
-                manifest_length: value.manifest_length,
-                partition_spec_id: value.partition_spec_id,
-                added_snapshot_id: value.added_snapshot_id,
-                added_files_count: value.added_files_count,
-                existing_files_count: value.existing_files_count,
-                deleted_files_count: value.deleted_files_count,
-                added_rows_count: value.added_rows_count,
-                existing_rows_count: value.existing_rows_count,
-                deleted_rows_count: value.deleted_rows_count,
-                partitions: value
-                    .partitions
-                    .map(|v| v.into_iter().map(Into::into).collect()),
-                key_metadata: value.key_metadata,
-            }
+            let ManifestListEntry { v1, .. } = value;
+            v1
         }
     }
 
     impl From<ManifestListEntry> for ManifestListEntryV2 {
         fn from(value: ManifestListEntry) -> Self {
             ManifestListEntryV2 {
-                manifest_path: value.manifest_path,
-                manifest_length: value.manifest_length,
-                partition_spec_id: value.partition_spec_id,
+                v1: value.v1,
                 content: value.content,
                 sequence_number: value.sequence_number,
                 min_sequence_number: value.min_sequence_number,
-                added_snapshot_id: value.added_snapshot_id,
-                added_files_count: value.added_files_count.unwrap(),
-                existing_files_count: value.existing_files_count.unwrap(),
-                deleted_files_count: value.deleted_files_count.unwrap(),
-                added_rows_count: value.added_rows_count.unwrap(),
-                existing_rows_count: value.existing_rows_count.unwrap(),
-                deleted_rows_count: value.deleted_rows_count.unwrap(),
-                partitions: value
-                    .partitions
-                    .map(|v| v.into_iter().map(Into::into).collect()),
-                key_metadata: value.key_metadata,
             }
         }
     }
@@ -353,123 +280,48 @@ mod _serde {
 }
 
 impl ManifestListEntry {
-    pub fn try_from_enum(
-        entry: ManifestListEntryEnum,
-        table_metadata: &TableMetadata,
-    ) -> Result<ManifestListEntry, Error> {
-        match entry {
-            ManifestListEntryEnum::V2(entry) => {
-                ManifestListEntry::try_from_v2(entry, table_metadata)
-            }
-            ManifestListEntryEnum::V1(entry) => {
-                ManifestListEntry::try_from_v1(entry, table_metadata)
-            }
-        }
+    pub fn try_from_enum(entry: ManifestListEntryEnum) -> Result<ManifestListEntry, Error> {
+        let result = match entry {
+            ManifestListEntryEnum::V2(entry) => ManifestListEntry::from(entry),
+            ManifestListEntryEnum::V1(entry) => ManifestListEntry::from(entry),
+            ManifestListEntryEnum::SparkV2(entry) => ManifestListEntry::from(entry),
+            ManifestListEntryEnum::SparkV1(entry) => ManifestListEntry::from(entry),
+        };
+        Ok(result)
     }
-
-    pub(crate) fn try_from_v2(
-        entry: _serde::ManifestListEntryV2,
-        table_metadata: &TableMetadata,
-    ) -> Result<ManifestListEntry, Error> {
-        let partition_types = table_metadata.default_partition_spec()?.data_types(
-            table_metadata
-                .current_schema(None)
-                .or(table_metadata
-                    .refs
-                    .values()
-                    .next()
-                    .ok_or(Error::NotFound("Current".to_string(), "schema".to_string()))
-                    .and_then(|x| table_metadata.schema(x.snapshot_id)))
-                .unwrap()
-                .fields(),
-        )?;
-        Ok(ManifestListEntry {
+}
+impl From<_serde::ManifestListEntryV2> for ManifestListEntry {
+    fn from(entry: _serde::ManifestListEntryV2) -> Self {
+        ManifestListEntry {
             format_version: FormatVersion::V2,
-            manifest_path: entry.manifest_path,
-            manifest_length: entry.manifest_length,
-            partition_spec_id: entry.partition_spec_id,
             content: entry.content,
             sequence_number: entry.sequence_number,
             min_sequence_number: entry.min_sequence_number,
-            added_snapshot_id: entry.added_snapshot_id,
-            added_files_count: Some(entry.added_files_count),
-            existing_files_count: Some(entry.existing_files_count),
-            deleted_files_count: Some(entry.deleted_files_count),
-            added_rows_count: Some(entry.added_rows_count),
-            existing_rows_count: Some(entry.existing_rows_count),
-            deleted_rows_count: Some(entry.deleted_rows_count),
-            partitions: entry
-                .partitions
-                .map(|v| {
-                    v.into_iter()
-                        .zip(partition_types.iter())
-                        .map(|(x, d)| FieldSummary::try_from(x, d))
-                        .collect::<Result<Vec<_>, Error>>()
-                })
-                .transpose()?,
-            key_metadata: entry.key_metadata,
-        })
+            v1: entry.v1,
+        }
     }
-
-    pub(crate) fn try_from_v1(
-        entry: _serde::ManifestListEntryV1,
-        table_metadata: &TableMetadata,
-    ) -> Result<ManifestListEntry, Error> {
-        let partition_types = table_metadata.default_partition_spec()?.data_types(
-            table_metadata
-                .current_schema(None)
-                .or(table_metadata
-                    .refs
-                    .values()
-                    .next()
-                    .ok_or(Error::NotFound("Current".to_string(), "schema".to_string()))
-                    .and_then(|x| table_metadata.schema(x.snapshot_id)))
-                .unwrap()
-                .fields(),
-        )?;
-        Ok(ManifestListEntry {
+}
+impl From<_serde::ManifestListEntryV1> for ManifestListEntry {
+    fn from(entry: _serde::ManifestListEntryV1) -> Self {
+        ManifestListEntry {
             format_version: FormatVersion::V1,
-            manifest_path: entry.manifest_path,
-            manifest_length: entry.manifest_length,
-            partition_spec_id: entry.partition_spec_id,
             content: Content::Data,
             sequence_number: 0,
             min_sequence_number: 0,
-            added_snapshot_id: entry.added_snapshot_id,
-            added_files_count: entry.added_files_count,
-            existing_files_count: entry.existing_files_count,
-            deleted_files_count: entry.deleted_files_count,
-            added_rows_count: entry.added_rows_count,
-            existing_rows_count: entry.existing_rows_count,
-            deleted_rows_count: entry.deleted_rows_count,
-            partitions: entry
-                .partitions
-                .map(|v| {
-                    v.into_iter()
-                        .zip(partition_types.iter())
-                        .map(|(x, d)| FieldSummary::try_from(x, d))
-                        .collect::<Result<Vec<_>, Error>>()
-                })
-                .transpose()?,
-            key_metadata: entry.key_metadata,
-        })
+            v1: entry,
+        }
     }
 }
 
-impl FieldSummary {
-    fn try_from(value: _serde::FieldSummarySerde, data_type: &Type) -> Result<Self, Error> {
-        Ok(FieldSummary {
-            contains_null: value.contains_null,
-            contains_nan: value.contains_nan,
-            lower_bound: value
-                .lower_bound
-                .map(|x| Value::try_from_bytes(&x, data_type))
-                .transpose()?,
-            upper_bound: value
-                .upper_bound
-                .map(|x| Value::try_from_bytes(&x, data_type))
-                .transpose()?,
-        })
+impl From<_serde::ManifestListEntrySparkV1> for ManifestListEntry {
+    fn from(_entry: _serde::ManifestListEntrySparkV1) -> Self {
+        todo!()
+    }
+}
+
+impl From<_serde::ManifestListEntrySparkV2> for ManifestListEntry {
+    fn from(_entry: _serde::ManifestListEntrySparkV2) -> Self {
+        todo!()
     }
 }
 
@@ -614,7 +466,7 @@ impl ManifestListEntry {
             ]
         }
         "#
-                .to_owned(),
+            .to_owned(),
             &FormatVersion::V2 => r#"
         {
             "type": "record",
@@ -743,7 +595,7 @@ impl ManifestListEntry {
             ]
         }
         "#
-                .to_owned(),
+            .to_owned(),
         };
         AvroSchema::parse_str(&schema).map_err(Into::into)
     }
@@ -755,90 +607,47 @@ pub(crate) fn avro_value_to_manifest_file(
 ) -> Result<ManifestListEntry, Error> {
     let entry = value.0?;
     let table_metadata = value.1;
-    match table_metadata.format_version {
-        FormatVersion::V1 => ManifestListEntry::try_from_v1(
-            apache_avro::from_value::<_serde::ManifestListEntryV1>(&entry)?,
-            table_metadata,
-        ),
-        FormatVersion::V2 => ManifestListEntry::try_from_v2(
-            apache_avro::from_value::<_serde::ManifestListEntryV2>(&entry)?,
-            table_metadata,
-        ),
-    }
+    let result = match table_metadata.format_version {
+        FormatVersion::V1 => ManifestListEntry::from(apache_avro::from_value::<
+            _serde::ManifestListEntryV1,
+        >(&entry)?),
+        FormatVersion::V2 => ManifestListEntry::from(apache_avro::from_value::<
+            _serde::ManifestListEntryV2,
+        >(&entry)?),
+    };
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
-
-    use std::collections::HashMap;
-
     use super::*;
-
-    use crate::spec::{
-        partition::{PartitionField, PartitionSpecBuilder, Transform},
-        schema::Schema,
-        table_metadata::TableMetadataBuilder,
-        types::{PrimitiveType, StructField, StructType},
-    };
 
     #[test]
     pub fn test_manifest_list_v2() {
-        let table_metadata = TableMetadataBuilder::default()
-            .location("/")
-            .current_schema_id(1)
-            .schemas(HashMap::from_iter(vec![(
-                1,
-                Schema::builder()
-                    .with_schema_id(1)
-                    .with_fields(
-                        StructType::builder()
-                            .with_struct_field(StructField {
-                                id: 0,
-                                name: "date".to_string(),
-                                required: true,
-                                field_type: Type::Primitive(PrimitiveType::Date),
-                                doc: None,
-                            })
-                            .build()
-                            .unwrap(),
-                    )
-                    .build()
-                    .unwrap(),
-            )]))
-            .default_spec_id(1)
-            .partition_specs(HashMap::from_iter(vec![(
-                1,
-                PartitionSpecBuilder::default()
-                    .with_spec_id(1)
-                    .with_partition_field(PartitionField::new(0, 1000, "day", Transform::Day))
-                    .build()
-                    .unwrap(),
-            )]))
-            .build()
-            .unwrap();
-
         let manifest_file = ManifestListEntry {
             format_version: FormatVersion::V2,
-            manifest_path: "".to_string(),
-            manifest_length: 1200,
-            partition_spec_id: 0,
             content: Content::Data,
             sequence_number: 566,
             min_sequence_number: 0,
-            added_snapshot_id: 39487483032,
-            added_files_count: Some(1),
-            existing_files_count: Some(2),
-            deleted_files_count: Some(0),
-            added_rows_count: Some(1000),
-            existing_rows_count: Some(8000),
-            deleted_rows_count: Some(0),
-            partitions: Some(vec![FieldSummary {
-                contains_null: true,
-                contains_nan: Some(false),
-                lower_bound: Some(Value::Date(1234)),
-                upper_bound: Some(Value::Date(76890)),
-            }]),
-            key_metadata: None,
+            v1: ManifestListEntryV1 {
+                manifest_path: "".to_string(),
+                manifest_length: 1200,
+                partition_spec_id: 0,
+                added_snapshot_id: 39487483032,
+                added_files_count: Some(1),
+                existing_files_count: Some(2),
+                deleted_files_count: Some(0),
+                added_rows_count: Some(1000),
+                existing_rows_count: Some(8000),
+                deleted_rows_count: Some(0),
+                partitions: Some(vec![FieldSummary {
+                    contains_null: true,
+                    contains_nan: Some(false),
+                    lower_bound: Some(Value::Date(1234)),
+                    upper_bound: Some(Value::Date(76890)),
+                }]),
+                key_metadata: None,
+            },
         };
 
         let schema = ManifestListEntry::schema(&FormatVersion::V2).unwrap();
@@ -854,72 +663,36 @@ mod tests {
         for record in reader {
             let result =
                 apache_avro::from_value::<_serde::ManifestListEntryV2>(&record.unwrap()).unwrap();
-            assert_eq!(
-                manifest_file,
-                ManifestListEntry::try_from_v2(result, &table_metadata).unwrap()
-            );
+            assert_eq!(manifest_file, ManifestListEntry::from(result));
         }
     }
 
     #[test]
     pub fn test_manifest_list_v1() {
-        let table_metadata = TableMetadataBuilder::default()
-            .format_version(FormatVersion::V1)
-            .location("/")
-            .current_schema_id(1)
-            .schemas(HashMap::from_iter(vec![(
-                1,
-                Schema::builder()
-                    .with_schema_id(1)
-                    .with_fields(
-                        StructType::builder()
-                            .with_struct_field(StructField {
-                                id: 0,
-                                name: "date".to_string(),
-                                required: true,
-                                field_type: Type::Primitive(PrimitiveType::Date),
-                                doc: None,
-                            })
-                            .build()
-                            .unwrap(),
-                    )
-                    .build()
-                    .unwrap(),
-            )]))
-            .default_spec_id(1)
-            .partition_specs(HashMap::from_iter(vec![(
-                1,
-                PartitionSpecBuilder::default()
-                    .with_spec_id(1)
-                    .with_partition_field(PartitionField::new(0, 1000, "day", Transform::Day))
-                    .build()
-                    .unwrap(),
-            )]))
-            .build()
-            .unwrap();
-
         let manifest_file = ManifestListEntry {
             format_version: FormatVersion::V1,
-            manifest_path: "".to_string(),
-            manifest_length: 1200,
-            partition_spec_id: 0,
             content: Content::Data,
             sequence_number: 0,
             min_sequence_number: 0,
-            added_snapshot_id: 39487483032,
-            added_files_count: Some(1),
-            existing_files_count: Some(2),
-            deleted_files_count: Some(0),
-            added_rows_count: Some(1000),
-            existing_rows_count: Some(8000),
-            deleted_rows_count: Some(0),
-            partitions: Some(vec![FieldSummary {
-                contains_null: true,
-                contains_nan: Some(false),
-                lower_bound: Some(Value::Date(1234)),
-                upper_bound: Some(Value::Date(76890)),
-            }]),
-            key_metadata: None,
+            v1: ManifestListEntryV1 {
+                added_snapshot_id: 39487483032,
+                manifest_path: "".to_string(),
+                manifest_length: 1200,
+                partition_spec_id: 0,
+                added_files_count: Some(1),
+                existing_files_count: Some(2),
+                deleted_files_count: Some(0),
+                added_rows_count: Some(1000),
+                existing_rows_count: Some(8000),
+                deleted_rows_count: Some(0),
+                partitions: Some(vec![FieldSummary {
+                    contains_null: true,
+                    contains_nan: Some(false),
+                    lower_bound: Some(Value::Date(1234)),
+                    upper_bound: Some(Value::Date(76890)),
+                }]),
+                key_metadata: None,
+            },
         };
 
         let schema = ManifestListEntry::schema(&FormatVersion::V1).unwrap();
@@ -935,10 +708,7 @@ mod tests {
         for record in reader {
             let result =
                 apache_avro::from_value::<_serde::ManifestListEntryV1>(&record.unwrap()).unwrap();
-            assert_eq!(
-                manifest_file,
-                ManifestListEntry::try_from_v1(result, &table_metadata).unwrap()
-            );
+            assert_eq!(manifest_file, ManifestListEntry::from(result));
         }
     }
 }

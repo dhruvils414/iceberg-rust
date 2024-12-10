@@ -16,7 +16,10 @@ use datafusion::physical_plan::PhysicalExpr;
 use futures::{lock::Mutex, stream, StreamExt, TryStreamExt};
 use iceberg_rust_spec::spec::{
     manifest::{partition_value_schema, DataFile, ManifestEntry, ManifestWriter, Status},
-    manifest_list::{Content, FieldSummary, ManifestListEntry, ManifestListEntryEnum},
+    manifest_list::{
+        Content, FieldSummary, ManifestListEntry, ManifestListEntryEnum,
+        _serde::ManifestListEntryV1,
+    },
     materialized_view_metadata::{depends_on_tables_to_string, SourceTable},
     partition::PartitionField,
     schema::Schema,
@@ -166,14 +169,15 @@ impl Operation {
                             let manifest = manifest
                                 .map_err(Into::into)
                                 .and_then(|value| {
-                                    ManifestListEntry::try_from_enum(
-                                        from_value::<ManifestListEntryEnum>(&value)?,
-                                        table_metadata,
-                                    )
+                                    ManifestListEntry::try_from_enum(from_value::<
+                                        ManifestListEntryEnum,
+                                    >(
+                                        &value
+                                    )?)
                                 })
                                 .unwrap();
 
-                            if let Some(summary) = &manifest.partitions {
+                            if let Some(summary) = &manifest.v1.partitions {
                                 let partition_values = partition_values_in_bounds(
                                     summary,
                                     datafiles.keys(),
@@ -225,21 +229,23 @@ impl Operation {
                                     + ".avro";
                                 let manifest = ManifestListEntry {
                                     format_version: table_metadata.format_version.clone(),
-                                    manifest_path: manifest_location,
-                                    manifest_length: 0,
-                                    partition_spec_id: table_metadata.default_spec_id,
                                     content: Content::Data,
                                     sequence_number: table_metadata.last_sequence_number,
                                     min_sequence_number: 0,
-                                    added_snapshot_id: snapshot_id,
-                                    added_files_count: Some(0),
-                                    existing_files_count: Some(0),
-                                    deleted_files_count: Some(0),
-                                    added_rows_count: Some(0),
-                                    existing_rows_count: Some(0),
-                                    deleted_rows_count: Some(0),
-                                    partitions: None,
-                                    key_metadata: None,
+                                    v1: ManifestListEntryV1 {
+                                        added_snapshot_id: snapshot_id,
+                                        manifest_path: manifest_location,
+                                        manifest_length: 0,
+                                        partition_spec_id: table_metadata.default_spec_id,
+                                        added_files_count: Some(0),
+                                        existing_files_count: Some(0),
+                                        deleted_files_count: Some(0),
+                                        added_rows_count: Some(0),
+                                        existing_rows_count: Some(0),
+                                        deleted_rows_count: Some(0),
+                                        partitions: None,
+                                        key_metadata: None,
+                                    },
                                 };
                                 Some((ManifestStatus::New(manifest), vec![partition_value.clone()]))
                             } else {
@@ -420,21 +426,23 @@ impl Operation {
                         + ".avro";
                     let manifest = ManifestListEntry {
                         format_version: table_metadata.format_version.clone(),
-                        manifest_path: manifest_location,
-                        manifest_length: 0,
-                        partition_spec_id: table_metadata.default_spec_id,
                         content: Content::Data,
                         sequence_number: table_metadata.last_sequence_number,
                         min_sequence_number: 0,
-                        added_snapshot_id: snapshot_id,
-                        added_files_count: Some(0),
-                        existing_files_count: Some(0),
-                        deleted_files_count: Some(0),
-                        added_rows_count: Some(0),
-                        existing_rows_count: Some(0),
-                        deleted_rows_count: Some(0),
-                        partitions: None,
-                        key_metadata: None,
+                        v1: ManifestListEntryV1 {
+                            manifest_path: manifest_location,
+                            manifest_length: 0,
+                            partition_spec_id: table_metadata.default_spec_id,
+                            added_snapshot_id: snapshot_id,
+                            added_files_count: Some(0),
+                            existing_files_count: Some(0),
+                            deleted_files_count: Some(0),
+                            added_rows_count: Some(0),
+                            existing_rows_count: Some(0),
+                            deleted_rows_count: Some(0),
+                            partitions: None,
+                            key_metadata: None,
+                        },
                     };
                     (ManifestStatus::New(manifest), vec![partition_value.clone()])
                 });
@@ -689,21 +697,23 @@ impl Operation {
                             + ".avro";
                         let manifest = ManifestListEntry {
                             format_version: table_metadata.format_version.clone(),
-                            manifest_path: manifest_location,
-                            manifest_length: 0,
-                            partition_spec_id: table_metadata.default_spec_id,
                             content: Content::Data,
                             sequence_number: table_metadata.last_sequence_number,
                             min_sequence_number: 0,
-                            added_snapshot_id: snapshot_id,
-                            added_files_count: Some(0),
-                            existing_files_count: Some(0),
-                            deleted_files_count: Some(0),
-                            added_rows_count: Some(0),
-                            existing_rows_count: Some(0),
-                            deleted_rows_count: Some(0),
-                            partitions: None,
-                            key_metadata: None,
+                            v1: ManifestListEntryV1 {
+                                manifest_path: manifest_location,
+                                manifest_length: 0,
+                                partition_spec_id: table_metadata.default_spec_id,
+                                added_snapshot_id: snapshot_id,
+                                added_files_count: Some(0),
+                                existing_files_count: Some(0),
+                                deleted_files_count: Some(0),
+                                added_rows_count: Some(0),
+                                existing_rows_count: Some(0),
+                                deleted_rows_count: Some(0),
+                                partitions: None,
+                                key_metadata: None,
+                            },
                         };
                         (ManifestStatus::New(manifest), vec![partition_value.clone()])
                     });
@@ -873,7 +883,7 @@ pub(crate) async fn write_manifest(
     let mut manifest = match manifest {
         ManifestStatus::Existing(manifest) => {
             let manifest_bytes: Vec<u8> = object_store
-                .get(&strip_prefix(&manifest.manifest_path).as_str().into())
+                .get(&strip_prefix(&manifest.v1.manifest_path).as_str().into())
                 .await?
                 .bytes()
                 .await?
@@ -885,15 +895,15 @@ pub(crate) async fn write_manifest(
         }
         ManifestStatus::New(manifest) => manifest,
     };
-    let files_count = manifest.added_files_count.unwrap_or_default() + files.len() as i32;
+    let files_count = manifest.v1.added_files_count.unwrap_or_default() + files.len() as i32;
     for path in files {
         for datafile in datafiles.get(&path).ok_or(Error::InvalidFormat(
             "Datafiles for partition value".to_string(),
         ))? {
             let mut added_rows_count = 0;
 
-            if manifest.partitions.is_none() {
-                manifest.partitions = Some(
+            if manifest.v1.partitions.is_none() {
+                manifest.v1.partitions = Some(
                     table_metadata
                         .default_partition_spec()?
                         .fields()
@@ -910,7 +920,7 @@ pub(crate) async fn write_manifest(
 
             added_rows_count += datafile.record_count();
             update_partitions(
-                manifest.partitions.as_mut().unwrap(),
+                manifest.v1.partitions.as_mut().unwrap(),
                 datafile.partition(),
                 partition_columns,
             )?;
@@ -930,11 +940,11 @@ pub(crate) async fn write_manifest(
 
             manifest_writer.append_ser(manifest_entry)?;
 
-            manifest.added_files_count = match manifest.added_files_count {
+            manifest.v1.added_files_count = match manifest.v1.added_files_count {
                 Some(count) => Some(count + files_count),
                 None => Some(files_count),
             };
-            manifest.added_rows_count = match manifest.added_rows_count {
+            manifest.v1.added_rows_count = match manifest.v1.added_rows_count {
                 Some(count) => Some(count + added_rows_count),
                 None => Some(added_rows_count),
             };
@@ -945,11 +955,11 @@ pub(crate) async fn write_manifest(
 
     let manifest_length: i64 = manifest_bytes.len() as i64;
 
-    manifest.manifest_length += manifest_length;
+    manifest.v1.manifest_length += manifest_length;
 
     object_store
         .put(
-            &strip_prefix(&manifest.manifest_path).as_str().into(),
+            &strip_prefix(&manifest.v1.manifest_path).as_str().into(),
             manifest_bytes.into(),
         )
         .await?;
