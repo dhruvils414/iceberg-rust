@@ -1024,7 +1024,7 @@ mod tests {
             }
         }
 
-        if let Tabular::Table(table) = &*(table.tabular.read().await) {
+        if let Tabular::Table(table) = table.tabular.read().await.deref() {
             assert_eq!(table.manifests(None, None).await.unwrap().len(), 2);
         };
     }

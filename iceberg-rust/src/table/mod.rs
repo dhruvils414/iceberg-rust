@@ -182,7 +182,7 @@ async fn datafiles(
         .map(|file| {
             let object_store = object_store.clone();
             async move {
-                let path: Path = util::strip_prefix(&file.v1.manifest_path).into();
+                let path: Path = util::strip_prefix(&file.manifest_path).into();
                 let bytes = Cursor::new(Vec::from(
                     object_store
                         .get(&path)
@@ -232,9 +232,7 @@ pub(crate) async fn delete_files(
         .try_for_each_concurrent(None, |manifest| {
             let object_store = object_store.clone();
             async move {
-                object_store
-                    .delete(&manifest.v1.manifest_path.into())
-                    .await?;
+                object_store.delete(&manifest.manifest_path.into()).await?;
                 Ok(())
             }
         })
