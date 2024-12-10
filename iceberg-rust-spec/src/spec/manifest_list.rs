@@ -210,36 +210,36 @@ pub mod _serde {
     }
 }
 
-impl From<ManifestListEntryEnum> for ManifestListEntry {
-    fn from(entry: ManifestListEntryEnum) -> Self {
+impl ManifestListEntry {
+    pub fn try_from_enum(entry: ManifestListEntryEnum) -> Result<ManifestListEntry, Error> {
         match entry {
-            ManifestListEntryEnum::V2(entry) => ManifestListEntry::from(entry),
-            ManifestListEntryEnum::V1(entry) => ManifestListEntry::from(entry),
+            ManifestListEntryEnum::V2(entry) => ManifestListEntry::try_from_v2(entry),
+            ManifestListEntryEnum::V1(entry) => ManifestListEntry::try_from_v1(entry),
         }
     }
-}
 
-impl From<_serde::ManifestListEntryV2> for ManifestListEntry {
-    fn from(entry: _serde::ManifestListEntryV2) -> Self {
-        ManifestListEntry {
+    pub(crate) fn try_from_v2(
+        entry: _serde::ManifestListEntryV2,
+    ) -> Result<ManifestListEntry, Error> {
+        Ok(ManifestListEntry {
             format_version: FormatVersion::V2,
             sequence_number: entry.sequence_number,
             min_sequence_number: entry.min_sequence_number,
             content: entry.content,
             v1: entry.v1,
-        }
+        })
     }
-}
 
-impl From<_serde::ManifestListEntryV1> for ManifestListEntry {
-    fn from(value: _serde::ManifestListEntryV1) -> Self {
-        ManifestListEntry {
+    pub(crate) fn try_from_v1(
+        entry: _serde::ManifestListEntryV1,
+    ) -> Result<ManifestListEntry, Error> {
+        Ok(ManifestListEntry {
             format_version: FormatVersion::V1,
             content: Content::Data,
             sequence_number: 0,
             min_sequence_number: 0,
-            v1: value,
-        }
+            v1: entry,
+        })
     }
 }
 
@@ -531,15 +531,14 @@ pub(crate) fn avro_value_to_manifest_file(
 ) -> Result<ManifestListEntry, Error> {
     let entry = value.0?;
     let table_metadata = value.1;
-    let result = match table_metadata.format_version {
-        FormatVersion::V1 => ManifestListEntry::from(apache_avro::from_value::<
+    match table_metadata.format_version {
+        FormatVersion::V1 => ManifestListEntry::try_from_v1(apache_avro::from_value::<
             _serde::ManifestListEntryV1,
         >(&entry)?),
-        FormatVersion::V2 => ManifestListEntry::from(apache_avro::from_value::<
+        FormatVersion::V2 => ManifestListEntry::try_from_v2(apache_avro::from_value::<
             _serde::ManifestListEntryV2,
         >(&entry)?),
-    };
-    Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -587,7 +586,10 @@ mod tests {
         for record in reader {
             let result =
                 apache_avro::from_value::<_serde::ManifestListEntryV2>(&record.unwrap()).unwrap();
-            assert_eq!(manifest_file, ManifestListEntry::from(result));
+            assert_eq!(
+                manifest_file,
+                ManifestListEntry::try_from_v2(result).unwrap()
+            );
         }
     }
 
@@ -632,7 +634,10 @@ mod tests {
         for record in reader {
             let result =
                 apache_avro::from_value::<_serde::ManifestListEntryV1>(&record.unwrap()).unwrap();
-            assert_eq!(manifest_file, ManifestListEntry::from(result));
+            assert_eq!(
+                manifest_file,
+                ManifestListEntry::try_from_v1(result).unwrap()
+            );
         }
     }
 }
