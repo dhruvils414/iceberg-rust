@@ -238,7 +238,20 @@ impl ManifestListEntry {
             content: Content::Data,
             sequence_number: 0,
             min_sequence_number: 0,
-            v1: entry,
+            v1: ManifestListEntryV1 {
+                added_snapshot_id: entry.added_snapshot_id,
+                manifest_path: entry.manifest_path,
+                manifest_length: entry.manifest_length,
+                partition_spec_id: entry.partition_spec_id,
+                added_files_count: entry.added_files_count,
+                existing_files_count: entry.existing_files_count,
+                deleted_files_count: entry.deleted_files_count,
+                added_rows_count: entry.added_rows_count,
+                existing_rows_count: entry.existing_rows_count,
+                deleted_rows_count: entry.deleted_rows_count,
+                partitions: entry.partitions,
+                key_metadata: entry.key_metadata,
+            },
         })
     }
 }
