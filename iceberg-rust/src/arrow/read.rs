@@ -4,7 +4,7 @@
 
 use std::{convert, sync::Arc};
 
-use arrow::record_batch::RecordBatch;
+use arrow::array::RecordBatch;
 use futures::{stream, Stream, StreamExt};
 use iceberg_rust_spec::util;
 use object_store::ObjectStore;

@@ -1,6 +1,6 @@
 /*!
  * Data Types
-*/
+ */
 use std::{collections::HashMap, fmt, ops::Index, slice::Iter};
 
 use derive_builder::Builder;
@@ -185,7 +185,7 @@ impl fmt::Display for PrimitiveType {
 pub struct StructType {
     /// Struct fields
     #[builder(setter(each(name = "with_struct_field")))]
-    pub fields: Vec<StructField>,
+    fields: Vec<StructField>,
     /// Lookup for index by field id
     #[serde(skip_serializing)]
     #[builder(
@@ -273,6 +273,10 @@ impl StructType {
         self.fields.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
+    }
+
     pub fn iter(&self) -> Iter<'_, StructField> {
         self.fields.iter()
     }
@@ -303,6 +307,18 @@ pub struct StructField {
     /// Fields may have an optional comment or doc string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
+}
+
+impl StructField {
+    pub fn new(id: i32, name: &str, required: bool, field_type: Type, doc: Option<String>) -> Self {
+        Self {
+            id,
+            name: name.to_owned(),
+            required,
+            field_type,
+            doc,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -434,7 +450,7 @@ mod tests {
         let record = r#"
         {
             "type": "struct",
-            "fields": [ 
+            "fields": [
                 {
                     "id": 1,
                     "name": "id",
@@ -445,7 +461,7 @@ mod tests {
                     "name": "data",
                     "required": false,
                     "type": "int"
-                } 
+                }
             ]
         }
         "#;

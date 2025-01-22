@@ -653,6 +653,8 @@ impl Operation {
                     })
                     .collect();
 
+                println!("files --> {:?}", files);
+
                 // append new_files to files
                 let mut files = files.clone();
                 files.append(&mut new_files.clone());
