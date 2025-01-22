@@ -25,11 +25,16 @@ pub(crate) const ICEBERG_FIELD_CURRENT: &str = "iceberg.field.current";
 use std::collections::HashMap;
 
 //use aws_sdk_glue::types::Column;
+use iceberg_rust::spec::table_metadata::TableMetadata;
 
-use iceberg_rust::spec::{
+use iceberg_rust::{
+    catalog::Catalog,
+    spec::{
+        partition::{PartitionField, PartitionSpecBuilder, Transform},
         schema::Schema,
         types::{ListType, MapType, PrimitiveType, StructField, StructType, Type},
-    };
+    },
+};
 
 use aws_sdk_glue::types::Column;
 
@@ -51,7 +56,7 @@ impl GlueSchemaBuilder {
         }
     }
 
-    pub fn build(self) -> GlueSchema {
+    pub fn build(mut self) -> GlueSchema {
         self.schema
     }
 
@@ -91,6 +96,7 @@ impl GlueSchemaBuilder {
     pub fn visit_schema(&mut self, schema: Schema) {
         self.visit_struct(&schema);
     }
+
     fn before_list_element(&mut self) -> Result<(), String> {
         Ok(())
     }
